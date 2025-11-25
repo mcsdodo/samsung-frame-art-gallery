@@ -89,6 +89,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -146,6 +153,7 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0; /* Allow flex child to shrink */
 }
 
 .main.mobile {
@@ -155,6 +163,7 @@ onUnmounted(() => {
 .panel {
   flex: 1;
   overflow: hidden;
+  min-height: 0; /* Allow flex child to shrink */
 }
 
 .divider {

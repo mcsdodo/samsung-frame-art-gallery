@@ -134,6 +134,8 @@ defineExpose({ loadArtwork })
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0; /* Allow flex child to shrink */
+  overflow: hidden;
   background: #12121f;
 }
 

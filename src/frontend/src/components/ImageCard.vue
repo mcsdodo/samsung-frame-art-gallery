@@ -32,7 +32,10 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, inject, onMounted, onUnmounted, nextTick } from 'vue'
+
+// Get scroll container from parent ImageGrid for proper IntersectionObserver root
+const scrollContainer = inject('scrollContainer', ref(null))
 
 const props = defineProps({
   image: { type: Object, required: true },
@@ -53,26 +56,30 @@ const LONG_PRESS_DELAY = 500
 let observer = null
 
 onMounted(() => {
-  // Use IntersectionObserver with 150% rootMargin (1.5x viewport preload)
-  observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          isVisible.value = true
-          // Once visible, stop observing (image stays loaded)
-          observer?.unobserve(entry.target)
-        }
-      })
-    },
-    {
-      rootMargin: '150% 0px', // Preload 1.5 viewport heights ahead
-      threshold: 0
-    }
-  )
+  // Use nextTick to ensure DOM is fully rendered before observing
+  nextTick(() => {
+    // Use IntersectionObserver with scroll container as root
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            isVisible.value = true
+            // Once visible, stop observing (image stays loaded)
+            observer?.unobserve(entry.target)
+          }
+        })
+      },
+      {
+        root: scrollContainer.value, // Use grid container as root
+        rootMargin: '200px 0px', // Preload 200px ahead
+        threshold: 0
+      }
+    )
 
-  if (cardRef.value) {
-    observer.observe(cardRef.value)
-  }
+    if (cardRef.value) {
+      observer.observe(cardRef.value)
+    }
+  })
 })
 
 onUnmounted(() => {

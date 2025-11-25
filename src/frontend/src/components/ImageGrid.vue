@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, provide } from 'vue'
 import ImageCard from './ImageCard.vue'
 
 const BATCH_SIZE = 24
@@ -63,6 +63,9 @@ const gridRef = ref(null)
 const sentinelRef = ref(null)
 const displayCount = ref(BATCH_SIZE)
 let observer = null
+
+// Provide scroll container to child ImageCards for IntersectionObserver
+provide('scrollContainer', gridRef)
 
 const visibleImages = computed(() => props.images.slice(0, displayCount.value))
 const hasMore = computed(() => displayCount.value < props.images.length)
@@ -132,6 +135,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0; /* Allow flex child to shrink below content size */
+  overflow: hidden;
 }
 
 .grid-header {
@@ -183,6 +188,7 @@ onUnmounted(() => {
   padding: 1rem;
   overflow-y: auto;
   flex: 1;
+  min-height: 0; /* Allow flex child to shrink and enable scrolling */
 }
 
 .load-more-sentinel {
