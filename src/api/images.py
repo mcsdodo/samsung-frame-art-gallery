@@ -28,20 +28,32 @@ async def list_images(folder: str = Query(None)):
     if not IMAGES_DIR.exists():
         return {"images": [], "folder": folder}
 
-    search_dir = IMAGES_DIR if folder is None else get_safe_path(folder)
+    if folder is None:
+        # List ALL images recursively
+        images = []
+        for path in IMAGES_DIR.rglob("*"):
+            if is_valid_image(path):
+                rel_path = path.relative_to(IMAGES_DIR)
+                images.append({
+                    "path": str(rel_path),
+                    "name": path.name,
+                    "size": path.stat().st_size
+                })
+    else:
+        # List images in specific folder only
+        search_dir = get_safe_path(folder)
+        if not search_dir.exists() or not search_dir.is_dir():
+            raise HTTPException(status_code=404, detail="Folder not found")
 
-    if not search_dir.exists() or not search_dir.is_dir():
-        raise HTTPException(status_code=404, detail="Folder not found")
-
-    images = []
-    for path in search_dir.iterdir():
-        if is_valid_image(path):
-            rel_path = path.relative_to(IMAGES_DIR)
-            images.append({
-                "path": str(rel_path),
-                "name": path.name,
-                "size": path.stat().st_size
-            })
+        images = []
+        for path in search_dir.iterdir():
+            if is_valid_image(path):
+                rel_path = path.relative_to(IMAGES_DIR)
+                images.append({
+                    "path": str(rel_path),
+                    "name": path.name,
+                    "size": path.stat().st_size
+                })
 
     images.sort(key=lambda x: x["name"].lower())
     return {"images": images, "folder": folder, "count": len(images)}
