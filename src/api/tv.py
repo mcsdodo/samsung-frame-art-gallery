@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
@@ -76,6 +77,18 @@ async def delete_artwork(content_id: str):
     try:
         client.delete_artwork(content_id)
         return {"success": True, "deleted": content_id}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.get("/artwork/{content_id}/thumbnail")
+async def get_artwork_thumbnail(content_id: str):
+    client = get_tv_client()
+    try:
+        thumbnail_data = client.get_thumbnail(content_id)
+        if not thumbnail_data:
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        return Response(content=thumbnail_data, media_type="image/jpeg")
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 

@@ -59,6 +59,10 @@ class TVClient:
                 tv.art().select_image(content_id)
         return result or {}
 
+    def get_thumbnail(self, content_id: str) -> bytes:
+        tv = self._get_tv()
+        return tv.art().get_thumbnail(content_id)
+
     def get_matte_options(self) -> dict:
         return {
             "styles": ["none", "modernthin", "modern", "flexible"],

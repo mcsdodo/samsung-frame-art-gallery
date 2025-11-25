@@ -43,7 +43,10 @@ const thumbnailUrl = computed(() => {
   if (props.isLocal) {
     return `/api/images/${encodeURIComponent(props.image.path)}/thumbnail`
   }
-  // TV artwork doesn't have thumbnails from our API
+  // TV artwork - fetch thumbnail from TV
+  if (props.image.content_id) {
+    return `/api/tv/artwork/${encodeURIComponent(props.image.content_id)}/thumbnail`
+  }
   return null
 })
 
