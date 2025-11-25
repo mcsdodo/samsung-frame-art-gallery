@@ -3,7 +3,7 @@ from typing import Optional
 from samsungtvws import SamsungTVWS
 
 TV_IP = os.environ.get("TV_IP", "192.168.0.105")
-TV_TIMEOUT = 10
+TV_TIMEOUT = 30  # Increased for thumbnail operations
 
 class TVClient:
     _instance: Optional["TVClient"] = None

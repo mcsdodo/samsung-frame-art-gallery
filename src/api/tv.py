@@ -83,6 +83,7 @@ async def delete_artwork(content_id: str):
 
 @router.get("/artwork/{content_id}/thumbnail")
 async def get_artwork_thumbnail(content_id: str):
+    """Get thumbnail for TV artwork. May timeout for built-in Samsung content."""
     client = get_tv_client()
     try:
         thumbnail_data = client.get_thumbnail(content_id)
@@ -90,6 +91,7 @@ async def get_artwork_thumbnail(content_id: str):
             raise HTTPException(status_code=404, detail="Thumbnail not found")
         return Response(content=thumbnail_data, media_type="image/jpeg")
     except Exception as e:
+        # Thumbnail retrieval often times out for built-in Samsung content
         raise HTTPException(status_code=503, detail=str(e))
 
 
