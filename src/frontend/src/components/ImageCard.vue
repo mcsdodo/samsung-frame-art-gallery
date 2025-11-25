@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="cardRef"
     class="image-card"
     :class="{ selected, current: isCurrent }"
     @click="$emit('toggle')"
@@ -13,11 +14,12 @@
       <input type="checkbox" :checked="selected" />
     </div>
     <img
-      v-if="thumbnailUrl && !imgError"
+      v-if="isVisible && thumbnailUrl && !imgError"
       :src="thumbnailUrl"
       :alt="displayName"
-      loading="lazy"
       @error="imgError = true"
+      @load="imgLoaded = true"
+      :class="{ loaded: imgLoaded }"
     />
     <div v-else class="placeholder">
       <span>{{ displayName.slice(0, 2).toUpperCase() }}</span>
@@ -30,7 +32,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   image: { type: Object, required: true },
@@ -41,9 +43,44 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle', 'preview'])
 
+const cardRef = ref(null)
+const isVisible = ref(false)
 const imgError = ref(false)
+const imgLoaded = ref(false)
 const longPressTimer = ref(null)
 const LONG_PRESS_DELAY = 500
+
+let observer = null
+
+onMounted(() => {
+  // Use IntersectionObserver with 150% rootMargin (1.5x viewport preload)
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          isVisible.value = true
+          // Once visible, stop observing (image stays loaded)
+          observer?.unobserve(entry.target)
+        }
+      })
+    },
+    {
+      rootMargin: '150% 0px', // Preload 1.5 viewport heights ahead
+      threshold: 0
+    }
+  )
+
+  if (cardRef.value) {
+    observer.observe(cardRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (observer && cardRef.value) {
+    observer.unobserve(cardRef.value)
+  }
+  observer = null
+})
 
 const onTouchStart = () => {
   longPressTimer.value = setTimeout(() => {
@@ -126,6 +163,12 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+img.loaded {
+  opacity: 1;
 }
 
 .placeholder {
