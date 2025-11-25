@@ -23,17 +23,25 @@
     <main class="main" :class="{ mobile: isMobile }">
       <!-- Desktop: Split view -->
       <template v-if="!isMobile">
-        <LocalPanel class="panel" @uploaded="refreshTV" />
+        <LocalPanel class="panel" @uploaded="refreshTV" @preview="showPreview" />
         <div class="divider"></div>
-        <TVPanel ref="tvPanel" class="panel" />
+        <TVPanel ref="tvPanel" class="panel" @preview="showPreview" />
       </template>
 
       <!-- Mobile: Tab content -->
       <template v-else>
-        <LocalPanel v-show="activeTab === 'local'" class="panel" @uploaded="refreshTV" />
-        <TVPanel v-show="activeTab === 'tv'" ref="tvPanel" class="panel" />
+        <LocalPanel v-show="activeTab === 'local'" class="panel" @uploaded="refreshTV" @preview="showPreview" />
+        <TVPanel v-show="activeTab === 'tv'" ref="tvPanel" class="panel" @preview="showPreview" />
       </template>
     </main>
+
+    <!-- Image Preview Modal -->
+    <ImagePreview
+      v-if="previewImage"
+      :image="previewImage"
+      :is-local="previewIsLocal"
+      @close="previewImage = null"
+    />
   </div>
 </template>
 
@@ -41,11 +49,19 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import LocalPanel from './views/LocalPanel.vue'
 import TVPanel from './views/TVPanel.vue'
+import ImagePreview from './components/ImagePreview.vue'
 
 const tvStatus = ref({ connected: false })
 const isMobile = ref(false)
 const activeTab = ref('local')
 const tvPanel = ref(null)
+const previewImage = ref(null)
+const previewIsLocal = ref(true)
+
+const showPreview = (image, isLocal) => {
+  previewImage.value = image
+  previewIsLocal.value = isLocal
+}
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768

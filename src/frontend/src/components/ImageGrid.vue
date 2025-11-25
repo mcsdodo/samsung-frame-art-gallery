@@ -27,6 +27,7 @@
         :is-current="currentId === (image.content_id)"
         :is-local="isLocal"
         @toggle="$emit('toggle', image)"
+        @preview="$emit('preview', image)"
       />
     </div>
   </div>
@@ -44,7 +45,7 @@ const props = defineProps({
   isLocal: { type: Boolean, default: true }
 })
 
-defineEmits(['toggle', 'select-all'])
+defineEmits(['toggle', 'select-all', 'preview'])
 
 const selectedCount = computed(() => props.selectedIds.size)
 const allSelected = computed(() =>

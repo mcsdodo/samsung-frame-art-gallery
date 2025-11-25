@@ -21,6 +21,7 @@
       :is-local="true"
       @toggle="toggleSelection"
       @select-all="selectAll"
+      @preview="(img) => $emit('preview', img, true)"
     />
 
     <ActionBar>
@@ -51,7 +52,7 @@ import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
 import MatteSelector from '../components/MatteSelector.vue'
 
-const emit = defineEmits(['uploaded'])
+const emit = defineEmits(['uploaded', 'preview'])
 
 const images = ref([])
 const folders = ref([])

@@ -15,6 +15,7 @@
       :is-local="false"
       @toggle="toggleSelection"
       @select-all="selectAll"
+      @preview="(img) => $emit('preview', img, false)"
     />
 
     <ActionBar>
@@ -43,6 +44,8 @@
 import { ref, onMounted } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
+
+defineEmits(['preview'])
 
 const artwork = ref([])
 const currentId = ref(null)

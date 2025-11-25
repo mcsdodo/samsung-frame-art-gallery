@@ -3,6 +3,11 @@
     class="image-card"
     :class="{ selected, current: isCurrent }"
     @click="$emit('toggle')"
+    @dblclick.stop="$emit('preview')"
+    @touchstart="onTouchStart"
+    @touchend="onTouchEnd"
+    @touchmove="onTouchCancel"
+    @touchcancel="onTouchCancel"
   >
     <div class="checkbox" @click.stop="$emit('toggle')">
       <input type="checkbox" :checked="selected" />
@@ -34,9 +39,31 @@ const props = defineProps({
   isLocal: { type: Boolean, default: true }
 })
 
-defineEmits(['toggle'])
+const emit = defineEmits(['toggle', 'preview'])
 
 const imgError = ref(false)
+const longPressTimer = ref(null)
+const LONG_PRESS_DELAY = 500
+
+const onTouchStart = () => {
+  longPressTimer.value = setTimeout(() => {
+    emit('preview')
+  }, LONG_PRESS_DELAY)
+}
+
+const onTouchEnd = () => {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+}
+
+const onTouchCancel = () => {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+}
 
 const thumbnailUrl = computed(() => {
   if (imgError.value) return null
