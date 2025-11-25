@@ -1,0 +1,8 @@
+services:
+  verify:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    network_mode: host
+    environment:
+      - TV_IP=${TV_IP:-192.168.0.105}
