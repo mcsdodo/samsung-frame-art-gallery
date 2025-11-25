@@ -132,7 +132,8 @@ const displayName = computed(() => {
 <style scoped>
 .image-card {
   position: relative;
-  aspect-ratio: 1;
+  width: 100%;
+  padding-bottom: 100%; /* 1:1 aspect ratio */
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
@@ -167,6 +168,9 @@ const displayName = computed(() => {
 }
 
 img {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -179,6 +183,9 @@ img.loaded {
 }
 
 .placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
