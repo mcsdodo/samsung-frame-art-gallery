@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const emit = defineEmits(['change', 'preview'])
 const props = defineProps({
@@ -33,11 +33,24 @@ const props = defineProps({
   }
 })
 
-const cropValue = ref(5)
+const cropValue = ref(0)
 
 const emitChange = () => {
   emit('change', cropValue.value)
 }
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/tv/config')
+    const data = await res.json()
+    if (data.default_crop_percent !== undefined) {
+      cropValue.value = data.default_crop_percent
+      emitChange()
+    }
+  } catch (e) {
+    // Use default of 0 if config fetch fails
+  }
+})
 </script>
 
 <style scoped>

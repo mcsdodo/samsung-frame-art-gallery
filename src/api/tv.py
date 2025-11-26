@@ -24,6 +24,7 @@ def require_tv_client() -> TVClient:
     return client
 
 IMAGES_DIR = Path(os.environ.get("IMAGES_DIR", "/images"))
+DEFAULT_CROP_PERCENT = int(os.environ.get("DEFAULT_CROP_PERCENT", "0"))
 
 
 def get_safe_path(relative_path: str) -> Path:
@@ -52,6 +53,14 @@ class TVSettingsRequest(BaseModel):
     ip: str
     name: str = "Samsung TV"
     manual_entry: bool = False
+
+
+@router.get("/config")
+async def get_config():
+    """Get app configuration including defaults."""
+    return {
+        "default_crop_percent": DEFAULT_CROP_PERCENT
+    }
 
 
 @router.get("/settings")
