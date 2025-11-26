@@ -102,10 +102,23 @@ import ResolutionWarning from '../components/ResolutionWarning.vue'
 
 const emit = defineEmits(['uploaded', 'preview'])
 
+// Read initial values from URL
+const getInitialParams = () => {
+  const params = new URLSearchParams(window.location.search)
+  return {
+    q: params.get('q') || '',
+    medium: params.get('medium') || 'Paintings',
+    department: params.get('department') ? parseInt(params.get('department')) : null,
+    highlights: params.get('highlights') !== 'false' // default true
+  }
+}
+
+const initialParams = getInitialParams()
+
 const departments = ref([])
-const selectedDepartment = ref(null)
-const selectedMedium = ref('Paintings') // Default to Paintings
-const highlightsOnly = ref(true) // Default to highlights only
+const selectedDepartment = ref(initialParams.department)
+const selectedMedium = ref(initialParams.medium)
+const highlightsOnly = ref(initialParams.highlights)
 const artwork = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
@@ -117,9 +130,42 @@ const hasMore = ref(false)
 const totalCount = ref(0)
 
 // Search state
-const searchQuery = ref('')
-const activeSearch = ref('')
+const searchQuery = ref(initialParams.q)
+const activeSearch = ref(initialParams.q)
 let searchDebounceTimer = null
+
+// Update URL with current filter state
+const updateUrl = () => {
+  const params = new URLSearchParams(window.location.search)
+  params.set('tab', 'met')
+
+  if (activeSearch.value) {
+    params.set('q', activeSearch.value)
+  } else {
+    params.delete('q')
+  }
+
+  if (selectedMedium.value) {
+    params.set('medium', selectedMedium.value)
+  } else {
+    params.delete('medium')
+  }
+
+  if (selectedDepartment.value) {
+    params.set('department', selectedDepartment.value)
+  } else {
+    params.delete('department')
+  }
+
+  if (!highlightsOnly.value) {
+    params.set('highlights', 'false')
+  } else {
+    params.delete('highlights')
+  }
+
+  const newUrl = `${window.location.pathname}?${params.toString()}`
+  window.history.replaceState({}, '', newUrl)
+}
 
 const showResolutionWarning = ref(false)
 const pendingUpload = ref({ display: false })
@@ -249,6 +295,7 @@ const doSearch = () => {
     searchDebounceTimer = null
   }
   activeSearch.value = searchQuery.value.trim()
+  updateUrl()
   loadArtwork()
 }
 
@@ -259,10 +306,12 @@ const clearSearch = () => {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
   }
+  updateUrl()
   loadArtwork()
 }
 
 const onFilterChange = () => {
+  updateUrl()
   loadArtwork()
 }
 

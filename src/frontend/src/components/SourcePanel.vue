@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import LocalPanel from '../views/LocalPanel.vue'
 import MetPanel from '../views/MetPanel.vue'
 
@@ -37,7 +37,22 @@ const tabs = [
   { id: 'met', label: 'Met Museum' }
 ]
 
-const activeTab = ref('local')
+// Read initial tab from URL, default to 'met'
+const getInitialTab = () => {
+  const params = new URLSearchParams(window.location.search)
+  const tab = params.get('tab')
+  return tab === 'local' ? 'local' : 'met'
+}
+
+const activeTab = ref(getInitialTab())
+
+// Update URL when tab changes
+watch(activeTab, (newTab) => {
+  const params = new URLSearchParams(window.location.search)
+  params.set('tab', newTab)
+  const newUrl = `${window.location.pathname}?${params.toString()}`
+  window.history.replaceState({}, '', newUrl)
+})
 </script>
 
 <style scoped>
