@@ -69,6 +69,8 @@ class MetClient:
             return cached
 
         try:
+            # Small delay to avoid rate limiting on rapid requests
+            time.sleep(0.1)
             data = self._fetch_json(f"{MET_API_BASE}/objects/{object_id}")
             # Only cache if has image
             if data.get("primaryImage") or data.get("primaryImageSmall"):
