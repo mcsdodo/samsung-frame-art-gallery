@@ -178,13 +178,12 @@ async def get_artwork_thumbnail(content_id: str):
 @router.post("/preview")
 async def preview_processed(request: PreviewRequest):
     """Generate preview of processed images (cropped + matted)."""
-    results = []
+    previews = []
 
     for path in request.paths:
         try:
             image_path = get_safe_path(path)
             if not image_path.exists():
-                results.append({"path": path, "success": False, "error": "File not found"})
                 continue
 
             image_data = image_path.read_bytes()
@@ -192,16 +191,16 @@ async def preview_processed(request: PreviewRequest):
                 generate_preview, image_data, request.crop_percent
             )
 
-            results.append({
-                "path": path,
-                "success": True,
+            previews.append({
+                "id": path,
+                "name": image_path.name,
                 "original": base64.b64encode(original).decode('utf-8'),
                 "processed": base64.b64encode(processed).decode('utf-8')
             })
         except Exception as e:
-            results.append({"path": path, "success": False, "error": str(e)})
+            pass  # Skip failed previews silently
 
-    return {"results": results}
+    return {"previews": previews}
 
 
 @router.post("/upload")

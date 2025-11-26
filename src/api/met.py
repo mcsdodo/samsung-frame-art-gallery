@@ -79,18 +79,16 @@ class MetUploadRequest(BaseModel):
 async def preview_met_artwork(request: MetPreviewRequest):
     """Generate preview of processed Met artwork (cropped + matted)."""
     met_client = get_met_client()
-    results = []
+    previews = []
 
     for object_id in request.object_ids:
         try:
             obj = await asyncio.to_thread(met_client.get_object, object_id)
             if not obj:
-                results.append({"object_id": object_id, "success": False, "error": "Object not found"})
                 continue
 
             image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
             if not image_url:
-                results.append({"object_id": object_id, "success": False, "error": "No image available"})
                 continue
 
             image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
@@ -98,17 +96,16 @@ async def preview_met_artwork(request: MetPreviewRequest):
                 generate_preview, image_data, request.crop_percent
             )
 
-            results.append({
-                "object_id": object_id,
-                "success": True,
-                "title": obj.get("title", "Untitled"),
+            previews.append({
+                "id": object_id,
+                "name": obj.get("title", "Untitled"),
                 "original": base64.b64encode(original).decode('utf-8'),
                 "processed": base64.b64encode(processed).decode('utf-8')
             })
         except Exception as e:
-            results.append({"object_id": object_id, "success": False, "error": str(e)})
+            pass  # Skip failed previews silently
 
-    return {"results": results}
+    return {"previews": previews}
 
 
 @router.post("/upload")
