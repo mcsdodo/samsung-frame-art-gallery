@@ -148,9 +148,9 @@ onUnmounted(() => {
 .image-grid-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0; /* Allow flex child to shrink below content size */
   overflow: hidden;
+  background: #12121f;
 }
 
 .grid-header {

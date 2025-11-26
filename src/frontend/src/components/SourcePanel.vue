@@ -33,8 +33,8 @@ import MetPanel from '../views/MetPanel.vue'
 defineEmits(['uploaded', 'preview'])
 
 const tabs = [
-  { id: 'local', label: 'Local' },
-  { id: 'met', label: 'Met Museum' }
+  { id: 'local', label: 'Local Images' },
+  { id: 'met', label: 'Metropolitan Museum of Art' }
 ]
 
 // Read initial tab from URL, default to 'met'
@@ -57,18 +57,13 @@ watch(activeTab, (newTab) => {
 
 <style scoped>
 .source-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
+  display: contents; /* Let children participate in parent subgrid */
 }
 
 .source-tabs {
   display: flex;
   background: #1a1a2e;
   border-bottom: 1px solid #2a2a4e;
-  flex-shrink: 0;
 }
 
 .source-tabs button {

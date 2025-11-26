@@ -1,7 +1,6 @@
 <template>
   <div class="met-panel">
     <div class="panel-header">
-      <h2>Metropolitan Museum of Art</h2>
       <div class="header-controls">
         <div class="search-box">
           <input
@@ -421,12 +420,7 @@ defineExpose({ loadMore, hasMore })
 
 <style scoped>
 .met-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  background: #12121f;
+  display: contents; /* Let children participate in parent subgrid */
 }
 
 .panel-header {
@@ -437,6 +431,7 @@ defineExpose({ loadMore, hasMore })
   border-bottom: 1px solid #2a2a4e;
   flex-wrap: wrap;
   gap: 0.5rem;
+  background: #12121f;
 }
 
 .panel-header h2 {
@@ -448,6 +443,7 @@ defineExpose({ loadMore, hasMore })
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .search-box {
@@ -513,5 +509,35 @@ defineExpose({ loadMore, hasMore })
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .panel-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .panel-header h2 {
+    margin-bottom: 0.5rem;
+  }
+
+  .header-controls {
+    justify-content: flex-start;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .search-box input {
+    width: 100%;
+  }
+
+  .header-controls select {
+    flex: 1;
+    min-width: 80px;
+  }
 }
 </style>

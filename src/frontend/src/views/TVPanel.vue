@@ -1,5 +1,11 @@
 <template>
   <div class="tv-panel">
+    <!-- Row 1: Tabs placeholder to align with source tabs -->
+    <div class="tabs-placeholder">
+      <span class="placeholder-text">&nbsp;</span>
+    </div>
+
+    <!-- Row 2: Panel header -->
     <div class="panel-header">
       <h2>TV Artwork</h2>
       <button class="refresh-btn" @click="loadArtwork" :disabled="loading">
@@ -7,6 +13,7 @@
       </button>
     </div>
 
+    <!-- Row 3: Image grid -->
     <ImageGrid
       :images="artwork"
       :selected-ids="selectedIds"
@@ -18,6 +25,7 @@
       @preview="(img) => $emit('preview', img, false)"
     />
 
+    <!-- Row 4: Action bar -->
     <ActionBar>
       <template #left>
         <span class="selected-count">{{ selectedIds.size }} selected</span>
@@ -131,20 +139,30 @@ defineExpose({ loadArtwork })
 
 <style scoped>
 .tv-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0; /* Allow flex child to shrink */
-  overflow: hidden;
-  background: #12121f;
+  display: contents; /* Let children participate in parent subgrid */
 }
 
+/* Row 1: Placeholder to align with source-tabs */
+.tabs-placeholder {
+  display: flex;
+  background: #1a1a2e;
+  border-bottom: 1px solid #2a2a4e;
+}
+
+/* Match source-tabs button styling exactly for same height */
+.placeholder-text {
+  padding: 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Row 2: Panel header */
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #2a2a4e;
+  background: #12121f;
 }
 
 .panel-header h2 {

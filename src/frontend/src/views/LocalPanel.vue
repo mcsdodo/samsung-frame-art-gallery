@@ -1,7 +1,6 @@
 <template>
   <div class="local-panel">
     <div class="panel-header">
-      <h2>Local Images</h2>
       <div class="folder-select">
         <button
           :class="{ active: !currentFolder }"
@@ -143,12 +142,7 @@ onMounted(() => {
 
 <style scoped>
 .local-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0; /* Allow flex child to shrink */
-  overflow: hidden;
-  background: #12121f;
+  display: contents; /* Let children participate in parent subgrid */
 }
 
 .panel-header {
@@ -157,6 +151,7 @@ onMounted(() => {
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #2a2a4e;
+  background: #12121f;
 }
 
 .panel-header h2 {

@@ -230,23 +230,34 @@ onUnmounted(() => {
 
 .main {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  grid-template-rows: auto auto 1fr auto; /* tabs, header, content, action bar */
   overflow: hidden;
-  min-height: 0; /* Allow flex child to shrink */
+  min-height: 0;
 }
 
 .main.mobile {
+  display: flex;
   flex-direction: column;
 }
 
 .panel {
-  flex: 1;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / -1; /* Span all 4 rows */
   overflow: hidden;
-  min-height: 0; /* Allow flex child to shrink */
+  min-height: 0;
+}
+
+.main.mobile .panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .divider {
-  width: 1px;
+  grid-row: 1 / -1; /* Span all rows */
   background: #2a2a4e;
 }
 
