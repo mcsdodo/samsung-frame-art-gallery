@@ -2,9 +2,11 @@
   <div class="app">
     <header class="header">
       <h1>Samsung Frame Art Gallery</h1>
-      <div class="status" :class="{ connected: tvStatus.connected }">
-        <span class="status-dot"></span>
-        {{ tvStatus.connected ? 'Connected' : 'Disconnected' }}
+      <div class="header-right">
+        <button class="tv-settings-btn" @click="openTvSettings" :title="tvName || 'TV Settings'">
+          <span class="tv-icon">📺</span>
+          <span class="status-dot" :class="{ connected: tvStatus.connected }"></span>
+        </button>
       </div>
     </header>
 
@@ -42,6 +44,13 @@
       :is-local="previewIsLocal"
       @close="previewImage = null"
     />
+
+    <!-- TV Connection Modal -->
+    <TvConnectionModal
+      v-if="showTvModal"
+      @close="showTvModal = false"
+      @connected="handleTvConnected"
+    />
   </div>
 </template>
 
@@ -50,6 +59,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import LocalPanel from './views/LocalPanel.vue'
 import TVPanel from './views/TVPanel.vue'
 import ImagePreview from './components/ImagePreview.vue'
+import TvConnectionModal from './components/TvConnectionModal.vue'
 
 const tvStatus = ref({ connected: false })
 const isMobile = ref(false)
@@ -57,6 +67,8 @@ const activeTab = ref('local')
 const tvPanel = ref(null)
 const previewImage = ref(null)
 const previewIsLocal = ref(true)
+const showTvModal = ref(false)
+const tvName = ref('')
 
 const showPreview = (image, isLocal) => {
   previewImage.value = image
@@ -71,15 +83,37 @@ const refreshTV = () => {
   tvPanel.value?.loadArtwork()
 }
 
+const handleTvConnected = (tv) => {
+  showTvModal.value = false
+  tvName.value = tv.name
+  tvStatus.value = { connected: true }
+  // Refresh TV panel
+  tvPanel.value?.loadArtwork()
+}
+
+const openTvSettings = () => {
+  showTvModal.value = true
+}
+
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
   try {
-    const res = await fetch('/api/tv/status')
-    tvStatus.value = await res.json()
+    const res = await fetch('/api/tv/settings')
+    const settings = await res.json()
+
+    if (!settings.configured) {
+      showTvModal.value = true
+    } else {
+      tvName.value = settings.selected_tv_name || ''
+      // Check actual connection status
+      const statusRes = await fetch('/api/tv/status')
+      tvStatus.value = await statusRes.json()
+    }
   } catch (e) {
-    console.error('Failed to get TV status:', e)
+    console.error('Failed to get TV settings:', e)
+    showTvModal.value = true
   }
 })
 
@@ -110,21 +144,41 @@ onUnmounted(() => {
   font-size: 1.5rem;
 }
 
-.status {
+.header-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
+  gap: 1rem;
 }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
+.tv-settings-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.tv-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tv-icon {
+  font-size: 1.5rem;
+}
+
+.tv-settings-btn .status-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #ff4444;
 }
 
-.status.connected .status-dot {
+.tv-settings-btn .status-dot.connected {
   background: #44ff44;
 }
 
