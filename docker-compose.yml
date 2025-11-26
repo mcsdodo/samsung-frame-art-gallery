@@ -8,6 +8,7 @@ services:
     volumes:
       - c:\_dev\dezoomify-processor\output\:/images:ro
       - thumbnails:/thumbnails
+      - ./data:/app/data
     environment:
       - TV_IP=${TV_IP:-192.168.0.105}
     restart: unless-stopped
