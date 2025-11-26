@@ -30,9 +30,9 @@
     <div v-else ref="gridRef" class="grid" @scroll="onScroll">
       <ImageCard
         v-for="image in visibleImages"
-        :key="image.path || image.content_id"
+        :key="image.path || image.object_id || image.content_id"
         :image="image"
-        :selected="selectedIds.has(image.path || image.content_id)"
+        :selected="selectedIds.has(image.path || image.object_id || image.content_id)"
         :is-current="currentId === (image.content_id)"
         :is-local="isLocal"
         @toggle="$emit('toggle', image)"
