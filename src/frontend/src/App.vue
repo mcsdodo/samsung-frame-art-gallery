@@ -78,10 +78,15 @@ const previewIsLocal = ref(true)
 const showTvModal = ref(false)
 const tvName = ref('')
 const toast = ref({ show: false, message: '', type: 'info' })
+const toastTimeout = ref(null)
 
 const showToast = (message, type = 'info') => {
+  // Clear any existing timeout to prevent memory leaks
+  if (toastTimeout.value) {
+    clearTimeout(toastTimeout.value)
+  }
   toast.value = { show: true, message, type }
-  setTimeout(() => {
+  toastTimeout.value = setTimeout(() => {
     toast.value.show = false
   }, 4000)
 }
@@ -136,6 +141,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  if (toastTimeout.value) {
+    clearTimeout(toastTimeout.value)
+  }
 })
 </script>
 
