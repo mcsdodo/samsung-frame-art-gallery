@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from src.api import images, tv
+from src.api import images, tv, met
 from src.services.thumbnails import initialize_thumbnails
 from src.services.tv_client import TVClient
 
@@ -42,6 +42,7 @@ app = FastAPI(title="Samsung Frame Art Gallery", lifespan=lifespan)
 # API routes
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(tv.router, prefix="/api/tv", tags=["tv"])
+app.include_router(met.router, prefix="/api/met", tags=["met"])
 
 # Serve static frontend (Vue build output)
 static_path = Path(__file__).parent.parent / "static"
