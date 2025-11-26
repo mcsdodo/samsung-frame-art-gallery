@@ -6,9 +6,17 @@ from pathlib import Path
 import os
 import asyncio
 
-from src.services.tv_client import get_tv_client
+from src.services.tv_client import get_tv_client, TVClient
 
 router = APIRouter()
+
+
+def require_tv_client() -> TVClient:
+    """Get TV client or raise 503 if not configured."""
+    client = get_tv_client()
+    if client is None:
+        raise HTTPException(status_code=503, detail="No TV configured")
+    return client
 
 IMAGES_DIR = Path(os.environ.get("IMAGES_DIR", "/images"))
 
@@ -34,18 +42,22 @@ class UploadRequest(BaseModel):
 @router.get("/status")
 async def get_status():
     client = get_tv_client()
-    return await asyncio.to_thread(client.get_status)
+    if client is None:
+        return {"connected": False, "configured": False, "error": "No TV configured"}
+    status = await asyncio.to_thread(client.get_status)
+    status["configured"] = True
+    return status
 
 
 @router.get("/mattes")
 async def get_mattes():
-    client = get_tv_client()
+    client = require_tv_client()
     return client.get_matte_options()
 
 
 @router.get("/artwork")
 async def list_artwork():
-    client = get_tv_client()
+    client = require_tv_client()
     try:
         artwork = await asyncio.to_thread(client.get_artwork_list)
         return {"artwork": artwork, "count": len(artwork)}
@@ -55,7 +67,7 @@ async def list_artwork():
 
 @router.get("/artwork/current")
 async def get_current_artwork():
-    client = get_tv_client()
+    client = require_tv_client()
     try:
         return await asyncio.to_thread(client.get_current_artwork)
     except Exception as e:
@@ -64,7 +76,7 @@ async def get_current_artwork():
 
 @router.post("/artwork/current")
 async def set_current_artwork(request: SetCurrentRequest):
-    client = get_tv_client()
+    client = require_tv_client()
     try:
         await asyncio.to_thread(client.set_current_artwork, request.content_id)
         return {"success": True, "content_id": request.content_id}
@@ -74,7 +86,7 @@ async def set_current_artwork(request: SetCurrentRequest):
 
 @router.delete("/artwork/{content_id}")
 async def delete_artwork(content_id: str):
-    client = get_tv_client()
+    client = require_tv_client()
     try:
         await asyncio.to_thread(client.delete_artwork, content_id)
         return {"success": True, "deleted": content_id}
@@ -85,7 +97,7 @@ async def delete_artwork(content_id: str):
 @router.get("/artwork/{content_id}/thumbnail")
 async def get_artwork_thumbnail(content_id: str):
     """Get thumbnail for TV artwork. May timeout for built-in Samsung content."""
-    client = get_tv_client()
+    client = require_tv_client()
     try:
         # Run blocking TV call in thread pool to not block event loop
         thumbnail_data = await asyncio.to_thread(client.get_thumbnail, content_id)
@@ -99,7 +111,7 @@ async def get_artwork_thumbnail(content_id: str):
 
 @router.post("/upload")
 async def upload_artwork(request: UploadRequest):
-    client = get_tv_client()
+    client = require_tv_client()
     results = []
 
     for path in request.paths:

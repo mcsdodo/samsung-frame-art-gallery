@@ -30,11 +30,15 @@ class TVClient:
 
     @classmethod
     def configure(cls, ip: str) -> "TVClient":
-        """Configure TVClient with a new IP. Clears old connection if switching."""
+        """Configure TVClient with a new IP. Clears old connection if switching.
+
+        Thread-safe: Acquires instance lock before clearing old TV connection.
+        """
         if cls._instance is not None and cls._current_ip != ip:
             _LOGGER.info(f"Switching TV from {cls._current_ip} to {ip}")
-            cls._instance._tv = None
-            cls._instance._thumbnail_cache.clear()
+            with cls._instance._lock:
+                cls._instance._tv = None
+                cls._instance._thumbnail_cache.clear()
 
         cls._instance = cls(ip)
         cls._current_ip = ip
