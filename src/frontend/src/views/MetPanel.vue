@@ -67,7 +67,7 @@
       <template #left>
         <CropSettings
           :has-selection="selectedIds.size > 0"
-          @change="cropPercent = $event"
+          @change="setCropPercent"
           @preview="loadPreviews"
         />
       </template>
@@ -355,6 +355,10 @@ const selectAll = (checked) => {
   } else {
     selectedIds.value = new Set()
   }
+}
+
+const setCropPercent = (value) => {
+  cropPercent.value = value
 }
 
 // Get actual image dimensions by loading it

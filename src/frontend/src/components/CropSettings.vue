@@ -33,7 +33,7 @@ const props = defineProps({
   }
 })
 
-const cropValue = ref(0)
+const cropValue = ref(5)
 
 const emitChange = () => {
   emit('change', cropValue.value)
