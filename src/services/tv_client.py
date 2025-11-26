@@ -132,9 +132,15 @@ class TVClient:
         self._thumbnail_cache.invalidate(content_id)
         return True
 
-    def upload_artwork(self, image_data: bytes, matte: str = "none",
+    def upload_artwork(self, image_data: bytes, matte_style: str = "none",
                        matte_color: str = "neutral", display: bool = False) -> dict:
         tv = self._get_tv()
+        # Matte format is "{style}_{color}" e.g. "modern_neutral", "flexible_apricot"
+        # "none" style doesn't need color suffix
+        if matte_style == "none":
+            matte = "none"
+        else:
+            matte = f"{matte_style}_{matte_color}"
         result = tv.art().upload(image_data, matte=matte, portrait_matte=matte)
         if display and result:
             content_id = result.get("content_id")
@@ -191,10 +197,52 @@ class TVClient:
         return None
 
     def get_matte_options(self) -> dict:
-        return {
-            "styles": ["none", "modernthin", "modern", "flexible"],
-            "colors": ["neutral", "antique", "warm", "cold"]
-        }
+        """Get available matte options from TV.
+
+        Returns dict with 'styles' and 'colors' lists, plus 'raw' list of
+        all matte combinations supported by the TV.
+        """
+        try:
+            tv = self._get_tv()
+            # get_matte_list(True) returns tuple: (matte_types_list, matte_colors_list)
+            raw_mattes, raw_colors = tv.art().get_matte_list(include_colour=True)
+
+            # Extract matte type strings from list of dicts
+            # raw_mattes: [{"matte_type": "none"}, {"matte_type": "modern_neutral"}, ...]
+            matte_types = [
+                matte_type for elem in raw_mattes for matte_type in elem.values()
+            ]
+
+            # Extract color strings from list of dicts
+            # raw_colors: [{"matte_color": "neutral"}, {"matte_color": "antique"}, ...]
+            colors = [
+                color for elem in raw_colors for color in elem.values()
+            ] if raw_colors else []
+
+            # Parse styles from matte types (strip color suffix)
+            styles = set()
+            for matte in matte_types:
+                if matte == "none":
+                    styles.add("none")
+                elif "_" in matte:
+                    style, _ = matte.rsplit("_", 1)
+                    styles.add(style)
+                else:
+                    styles.add(matte)
+
+            return {
+                "styles": sorted(list(styles)),
+                "colors": sorted(list(set(colors))) if colors else ["neutral"],
+                "raw": matte_types
+            }
+        except Exception as e:
+            _LOGGER.warning(f"Failed to get matte list from TV: {e}, using defaults")
+            # Fallback to common defaults
+            return {
+                "styles": ["none", "modernthin", "modern", "modernwide", "flexible"],
+                "colors": ["neutral", "antique", "warm", "polar", "sand", "seafoam", "sage", "navy", "apricot", "black"],
+                "raw": []
+            }
 
     def clear_thumbnail_cache(self) -> None:
         """Clear all cached thumbnails."""
