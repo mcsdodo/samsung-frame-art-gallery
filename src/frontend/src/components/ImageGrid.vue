@@ -21,9 +21,9 @@
       <slot name="header-actions"></slot>
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading && images.length === 0" class="loading">Loading...</div>
 
-    <div v-else-if="images.length === 0" class="empty">
+    <div v-else-if="!loading && images.length === 0" class="empty">
       No images found
     </div>
 
