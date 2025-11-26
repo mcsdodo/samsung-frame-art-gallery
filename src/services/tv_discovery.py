@@ -80,6 +80,7 @@ def discover_tvs() -> list[DiscoveredTV]:
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('', 0))  # Bind to any interface, random port for receiving responses
         sock.settimeout(SSDP_TIMEOUT)
 
         # Send discovery request
