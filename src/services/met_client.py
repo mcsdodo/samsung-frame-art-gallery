@@ -38,7 +38,11 @@ class MetClient:
     def _fetch_json(self, url: str) -> dict:
         """Fetch JSON from URL."""
         _LOGGER.debug(f"Fetching: {url}")
-        with urllib.request.urlopen(url, timeout=10) as response:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "SamsungFrameArtGallery/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode())
 
     def get_departments(self) -> list[dict]:
