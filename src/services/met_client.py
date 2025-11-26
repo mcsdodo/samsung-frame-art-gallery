@@ -41,6 +41,18 @@ class MetClient:
         with urllib.request.urlopen(url, timeout=10) as response:
             return json.loads(response.read().decode())
 
+    def get_departments(self) -> list[dict]:
+        """Get list of museum departments. Cached for 24h."""
+        cache_key = "departments"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        data = self._fetch_json(f"{MET_API_BASE}/departments")
+        departments = data.get("departments", [])
+        self._set_cached(cache_key, departments, self._departments_ttl)
+        return departments
+
 
 # Singleton instance
 _client: Optional[MetClient] = None
