@@ -133,7 +133,7 @@ const displayName = computed(() => {
 .image-card {
   position: relative;
   width: 100%;
-  padding-bottom: 100%; /* 1:1 aspect ratio */
+  padding-bottom: 56.25%; /* 16:9 landscape aspect ratio */
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
