@@ -3,7 +3,7 @@
     <div class="panel-header">
       <h2>Metropolitan Museum of Art</h2>
       <div class="department-select">
-        <select v-model="selectedDepartment" @change="loadArtwork">
+        <select v-model="selectedDepartment" @change="loadArtwork()">
           <option :value="null">Highlights</option>
           <option
             v-for="dept in departments"
