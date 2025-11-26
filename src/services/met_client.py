@@ -149,6 +149,16 @@ class MetClient:
             "has_more": end < total
         }
 
+    def fetch_image(self, image_url: str) -> bytes:
+        """Download image bytes from Met servers."""
+        _LOGGER.info(f"Downloading image: {image_url}")
+        req = urllib.request.Request(
+            image_url,
+            headers={"User-Agent": "SamsungFrameArtGallery/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return response.read()
+
 
 # Singleton instance
 _client: Optional[MetClient] = None
