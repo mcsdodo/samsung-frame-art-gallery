@@ -292,8 +292,36 @@ const selectAll = (checked) => {
   }
 }
 
+// Get actual image dimensions by loading it
+const getImageDimensions = (url) => {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve({ width: 0, height: 0 })
+    img.src = url
+  })
+}
+
+// Fetch real dimensions for images with unknown resolution
+const fetchMissingDimensions = async () => {
+  const selectedArtwork = artwork.value.filter(img =>
+    selectedIds.value.has(img.object_id)
+  )
+
+  for (const img of selectedArtwork) {
+    if (!img.width || !img.height) {
+      const dims = await getImageDimensions(img.image_url)
+      img.width = dims.width
+      img.height = dims.height
+    }
+  }
+}
+
 const upload = async (display) => {
   if (selectedIds.value.size === 0) return
+
+  // Fetch real dimensions for images with unknown resolution
+  await fetchMissingDimensions()
 
   // Check for low resolution images
   if (lowResImages.value.length > 0) {

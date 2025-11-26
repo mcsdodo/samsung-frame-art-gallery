@@ -3,14 +3,14 @@
     <div class="modal">
       <h3>Low Resolution Warning</h3>
       <p>
-        The following images are smaller than your TV's 4K resolution (3840 × 2160)
-        and may appear pixelated:
+        The following images may be smaller than your TV's 4K resolution (3840 × 2160)
+        and could appear pixelated:
       </p>
 
       <ul class="image-list">
         <li v-for="img in images" :key="img.object_id">
           <strong>{{ img.title }}</strong>
-          <span class="resolution">{{ img.width }} × {{ img.height }}</span>
+          <span class="resolution">{{ formatResolution(img) }}</span>
         </li>
       </ul>
 
@@ -28,6 +28,13 @@ defineProps({
 })
 
 defineEmits(['confirm', 'cancel'])
+
+const formatResolution = (img) => {
+  if (!img.width || !img.height || (img.width === 0 && img.height === 0)) {
+    return 'Resolution unknown'
+  }
+  return `${img.width} × ${img.height}`
+}
 </script>
 
 <style scoped>
