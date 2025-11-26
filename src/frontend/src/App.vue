@@ -51,6 +51,14 @@
       @close="showTvModal = false"
       @connected="handleTvConnected"
     />
+
+    <!-- Toast Notification -->
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      {{ toast.message }}
+      <button v-if="toast.type === 'error'" class="toast-action" @click="showTvModal = true">
+        Settings
+      </button>
+    </div>
   </div>
 </template>
 
@@ -69,6 +77,14 @@ const previewImage = ref(null)
 const previewIsLocal = ref(true)
 const showTvModal = ref(false)
 const tvName = ref('')
+const toast = ref({ show: false, message: '', type: 'info' })
+
+const showToast = (message, type = 'info') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
 
 const showPreview = (image, isLocal) => {
   previewImage.value = image
@@ -87,6 +103,7 @@ const handleTvConnected = (tv) => {
   showTvModal.value = false
   tvName.value = tv.name
   tvStatus.value = { connected: true }
+  showToast(`Connected to ${tv.name}`, 'success')
   // Refresh TV panel
   tvPanel.value?.loadArtwork()
 }
@@ -223,5 +240,49 @@ onUnmounted(() => {
 .divider {
   width: 1px;
   background: #2a2a4e;
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.5rem;
+  background: #2a2a4e;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1001;
+  animation: slideUp 0.3s ease;
+}
+
+.toast.success {
+  background: #2d5a3d;
+}
+
+.toast.error {
+  background: #5a2d2d;
+}
+
+.toast-action {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 </style>
