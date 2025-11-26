@@ -200,7 +200,8 @@ class MetClient:
         encoded_query = urllib.parse.quote(query)
 
         # Build cache key and URL
-        params = [f"hasImages=true", f"q={encoded_query}"]
+        # IMPORTANT: q parameter must come LAST for Met API to work correctly
+        params = ["hasImages=true"]
         cache_parts = [f"search:{query}"]
 
         if department_id:
@@ -213,6 +214,9 @@ class MetClient:
         if highlights_only:
             params.append("isHighlight=true")
             cache_parts.append("highlights")
+
+        # q must be last
+        params.append(f"q={encoded_query}")
 
         cache_key = ":".join(cache_parts) + ":ids"
         url = f"{MET_API_BASE}/search?" + "&".join(params)
