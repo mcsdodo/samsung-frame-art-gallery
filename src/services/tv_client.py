@@ -1,4 +1,3 @@
-import os
 import logging
 import threading
 import time
@@ -6,31 +5,58 @@ from typing import Optional
 from samsungtvws import SamsungTVWS
 
 from src.services.tv_thumbnail_cache import TVThumbnailCache
+from src.services.tv_settings import load_settings
 
 _LOGGER = logging.getLogger(__name__)
 
-TV_IP = os.environ.get("TV_IP", "192.168.0.105")
-TV_TIMEOUT = 30  # Increased for thumbnail operations
+TV_TIMEOUT = 30
 
 
 class TVClient:
     _instance: Optional["TVClient"] = None
+    _current_ip: Optional[str] = None
 
-    def __init__(self):
+    def __init__(self, ip: str):
+        self._ip = ip
         self._tv: Optional[SamsungTVWS] = None
         self._api_version: Optional[str] = None
         self._lock = threading.Lock()
         self._thumbnail_cache = TVThumbnailCache()
 
     @classmethod
-    def get_instance(cls) -> "TVClient":
-        if cls._instance is None:
-            cls._instance = cls()
+    def get_instance(cls) -> Optional["TVClient"]:
+        """Get current TVClient instance, or None if not configured."""
         return cls._instance
+
+    @classmethod
+    def configure(cls, ip: str) -> "TVClient":
+        """Configure TVClient with a new IP. Clears old connection if switching."""
+        if cls._instance is not None and cls._current_ip != ip:
+            _LOGGER.info(f"Switching TV from {cls._current_ip} to {ip}")
+            cls._instance._tv = None
+            cls._instance._thumbnail_cache.clear()
+
+        cls._instance = cls(ip)
+        cls._current_ip = ip
+        _LOGGER.info(f"TVClient configured for {ip}")
+        return cls._instance
+
+    @classmethod
+    def initialize_from_settings(cls) -> Optional["TVClient"]:
+        """Initialize TVClient from saved settings."""
+        settings = load_settings()
+        if settings.configured:
+            return cls.configure(settings.selected_tv_ip)
+        _LOGGER.info("No TV configured in settings")
+        return None
+
+    @property
+    def ip(self) -> str:
+        return self._ip
 
     def _get_tv(self) -> SamsungTVWS:
         if self._tv is None:
-            self._tv = SamsungTVWS(TV_IP, timeout=TV_TIMEOUT)
+            self._tv = SamsungTVWS(self._ip, timeout=TV_TIMEOUT)
         return self._tv
 
     def get_api_version(self) -> str:
@@ -45,12 +71,11 @@ class TVClient:
         """Check if TV uses new API (4.0+) which requires SSL for thumbnails."""
         try:
             version = self.get_api_version()
-            # Version format: "4.3.4.0" or "2.03"
             major = int(version.split('.')[0])
             return major >= 4
         except Exception as e:
             _LOGGER.warning(f"Could not determine API version: {e}, assuming new API")
-            return True  # Default to new API (safer for 2022+ TVs)
+            return True
 
     def get_status(self) -> dict:
         try:
@@ -60,14 +85,14 @@ class TVClient:
             return {
                 "connected": True,
                 "art_mode_supported": supported,
-                "tv_ip": TV_IP,
+                "tv_ip": self._ip,
                 "api_version": api_version,
                 "uses_ssl_thumbnails": self._is_new_api()
             }
         except Exception as e:
             self._tv = None
             self._api_version = None
-            return {"connected": False, "error": str(e), "tv_ip": TV_IP}
+            return {"connected": False, "error": str(e), "tv_ip": self._ip}
 
     def get_artwork_list(self) -> list:
         tv = self._get_tv()
@@ -85,7 +110,6 @@ class TVClient:
     def delete_artwork(self, content_id: str) -> bool:
         tv = self._get_tv()
         tv.art().delete(content_id)
-        # Invalidate thumbnail cache when artwork is deleted
         self._thumbnail_cache.invalidate(content_id)
         return True
 
@@ -104,14 +128,11 @@ class TVClient:
         tv = self._get_tv()
 
         if self._is_new_api():
-            # New API (4.0+) requires get_thumbnail_list with SSL
             thumbnails = tv.art().get_thumbnail_list([content_id])
             if thumbnails:
-                # Returns dict like {"content_id.jpg": bytearray}
                 data = list(thumbnails.values())[0]
                 return bytes(data) if isinstance(data, bytearray) else data
         else:
-            # Old API (< 4.0) uses get_thumbnail without SSL
             data = tv.art().get_thumbnail(content_id)
             if data:
                 return bytes(data) if isinstance(data, bytearray) else data
@@ -119,21 +140,11 @@ class TVClient:
         return None
 
     def get_thumbnail(self, content_id: str, retries: int = 2) -> Optional[bytes]:
-        """Get thumbnail with caching, request serialization, and retry logic.
-
-        Args:
-            content_id: The artwork content ID
-            retries: Number of retry attempts for transient failures
-
-        Returns:
-            Thumbnail image data as bytes, or None if not found
-        """
-        # Check cache first (no lock needed for cache read)
+        """Get thumbnail with caching, request serialization, and retry logic."""
         cached = self._thumbnail_cache.get(content_id)
         if cached:
             return cached
 
-        # Fetch from TV with lock to prevent concurrent requests
         data = None
         last_error = None
 
@@ -148,11 +159,9 @@ class TVClient:
                 _LOGGER.warning(f"Thumbnail fetch attempt {attempt + 1} failed for {content_id}: {e}")
                 if attempt < retries:
                     time.sleep(0.5)
-                    # Reset connection on failure
                     self._tv = None
 
         if data:
-            # Cache the result
             self._thumbnail_cache.set(content_id, data)
             return data
 
@@ -173,5 +182,6 @@ class TVClient:
         self._thumbnail_cache.clear()
 
 
-def get_tv_client() -> TVClient:
+def get_tv_client() -> Optional[TVClient]:
+    """Get current TVClient instance."""
     return TVClient.get_instance()
