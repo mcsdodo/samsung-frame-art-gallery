@@ -1,0 +1,15 @@
+https://metmuseum.github.io/ here is some documentation for The Metropolitan Museum of Art Collection API.
+
+# Preparation
+1. Read the documentation of the Met Museum Collection API: https://metmuseum.github.io/
+2. analyze what's possible with the API, e.g. search for art pieces, get details, get images etc.
+
+# Implementation ideas:
+1. split the "Local Images" section into two sections: "Local Images" and "Metropolitan Museum of Art". Could be tabs and must be extensible to add another data source.
+2. introduce a search field (based on the API search capabilities) to search for specific art pieces, artists, or art movements.
+3. display the results as thumbnails, user can select specific images.
+4. upon selection "Upload click" upload to the TV.
+
+
+# Think about:
+1. should we not split the backend and frontend (in general) for faster iterations?

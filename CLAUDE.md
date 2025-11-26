@@ -121,3 +121,8 @@ npm run build
 - TV must be powered on (not deep standby) for discovery
 - Supports JPEG, PNG image formats
 - Tested with Samsung Frame TVs (Art Mode required)
+
+
+# Development environments
+1. for development use docker-compose file
+2. for deployment on a server use passwordless ssh ``ssh root@192.168.0.99`` and run the docker commands there

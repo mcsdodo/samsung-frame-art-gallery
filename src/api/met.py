@@ -25,14 +25,14 @@ async def get_departments():
 
 
 @router.get("/highlights")
-async def get_highlights(page: int = 1, page_size: int = 24):
+async def get_highlights(page: int = 1, page_size: int = 48):
     """Get highlighted artworks, paginated."""
     client = get_met_client()
     return await asyncio.to_thread(client.get_highlights, page, page_size)
 
 
 @router.get("/objects")
-async def get_objects(department_id: int, page: int = 1, page_size: int = 24):
+async def get_objects(department_id: int, page: int = 1, page_size: int = 48):
     """Get artworks by department, paginated."""
     client = get_met_client()
     return await asyncio.to_thread(client.get_by_department, department_id, page, page_size)

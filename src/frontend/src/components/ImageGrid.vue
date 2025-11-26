@@ -54,10 +54,11 @@ const props = defineProps({
   selectedIds: { type: Set, default: () => new Set() },
   currentId: { type: String, default: null },
   loading: { type: Boolean, default: false },
-  isLocal: { type: Boolean, default: true }
+  isLocal: { type: Boolean, default: true },
+  hasMoreExternal: { type: Boolean, default: false }
 })
 
-defineEmits(['toggle', 'select-all', 'preview'])
+const emit = defineEmits(['toggle', 'select-all', 'preview', 'load-more'])
 
 const gridRef = ref(null)
 const sentinelRef = ref(null)
@@ -68,7 +69,8 @@ let observer = null
 provide('scrollContainer', gridRef)
 
 const visibleImages = computed(() => props.images.slice(0, displayCount.value))
-const hasMore = computed(() => displayCount.value < props.images.length)
+const hasMoreInternal = computed(() => displayCount.value < props.images.length)
+const hasMore = computed(() => hasMoreInternal.value || props.hasMoreExternal)
 const selectedCount = computed(() => props.selectedIds.size)
 const allSelected = computed(() =>
   props.images.length > 0 && props.selectedIds.size === props.images.length
@@ -80,8 +82,12 @@ watch(() => props.images, () => {
 }, { deep: false })
 
 const loadMore = () => {
-  if (hasMore.value) {
+  if (hasMoreInternal.value) {
+    // Still have local images to reveal
     displayCount.value = Math.min(displayCount.value + BATCH_SIZE, props.images.length)
+  } else if (props.hasMoreExternal) {
+    // Need to fetch more from API
+    emit('load-more')
   }
 }
 

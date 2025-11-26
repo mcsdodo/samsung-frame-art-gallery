@@ -21,9 +21,11 @@
       :selected-ids="selectedIds"
       :loading="loading"
       :is-local="false"
+      :has-more-external="hasMore"
       @toggle="toggleSelection"
       @select-all="selectAll"
       @preview="(img) => $emit('preview', img)"
+      @load-more="loadMore"
     />
 
     <ActionBar>

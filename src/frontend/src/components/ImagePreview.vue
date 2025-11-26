@@ -27,6 +27,10 @@ const imageUrl = computed(() => {
   if (props.isLocal) {
     return `/api/images/${encodeURIComponent(props.image.path)}/full`
   }
+  // Met artwork - use full resolution image URL directly
+  if (props.image.image_url) {
+    return props.image.image_url
+  }
   // TV artwork - use thumbnail as full image (TV API limitation)
   if (props.image.content_id) {
     return `/api/tv/artwork/${encodeURIComponent(props.image.content_id)}/thumbnail`
@@ -37,6 +41,11 @@ const imageUrl = computed(() => {
 const imageName = computed(() => {
   if (props.isLocal) {
     return props.image.name
+  }
+  // Met artwork - show title and artist
+  if (props.image.title) {
+    const artist = props.image.artist ? ` - ${props.image.artist}` : ''
+    return `${props.image.title}${artist}`
   }
   return props.image.content_id || 'Unknown'
 })
