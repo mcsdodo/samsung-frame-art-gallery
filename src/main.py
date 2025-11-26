@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.api import images, tv
 from src.services.thumbnails import initialize_thumbnails
+from src.services.tv_client import TVClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,6 +21,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Samsung Frame Art Gallery...")
     executor = ThreadPoolExecutor(max_workers=1)
     executor.submit(initialize_thumbnails)
+
+    # Initialize TV client from saved settings
+    TVClient.initialize_from_settings()
+
     yield
     executor.shutdown(wait=False)
 
