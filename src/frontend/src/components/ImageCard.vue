@@ -111,6 +111,10 @@ const onTouchCancel = () => {
 
 const thumbnailUrl = computed(() => {
   if (imgError.value) return null
+  // Met images have direct thumbnail URL
+  if (props.image.thumbnail) {
+    return props.image.thumbnail
+  }
   if (props.isLocal) {
     return `/api/images/${encodeURIComponent(props.image.path)}/thumbnail`
   }
@@ -124,6 +128,10 @@ const thumbnailUrl = computed(() => {
 const displayName = computed(() => {
   if (props.isLocal) {
     return props.image.name
+  }
+  // Met images have title
+  if (props.image.title) {
+    return props.image.title
   }
   return props.image.content_id || 'Unknown'
 })
