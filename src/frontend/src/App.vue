@@ -15,7 +15,7 @@
       <button
         :class="{ active: activeTab === 'local' }"
         @click="activeTab = 'local'"
-      >Local</button>
+      >Images</button>
       <button
         :class="{ active: activeTab === 'tv' }"
         @click="activeTab = 'tv'"
@@ -25,14 +25,14 @@
     <main class="main" :class="{ mobile: isMobile }">
       <!-- Desktop: Split view -->
       <template v-if="!isMobile">
-        <LocalPanel class="panel" @uploaded="refreshTV" @preview="showPreview" />
+        <SourcePanel class="panel" @uploaded="refreshTV" @preview="showPreview" />
         <div class="divider"></div>
         <TVPanel ref="tvPanel" class="panel" @preview="showPreview" />
       </template>
 
       <!-- Mobile: Tab content -->
       <template v-else>
-        <LocalPanel v-show="activeTab === 'local'" class="panel" @uploaded="refreshTV" @preview="showPreview" />
+        <SourcePanel v-show="activeTab === 'local'" class="panel" @uploaded="refreshTV" @preview="showPreview" />
         <TVPanel v-show="activeTab === 'tv'" ref="tvPanel" class="panel" @preview="showPreview" />
       </template>
     </main>
@@ -64,7 +64,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import LocalPanel from './views/LocalPanel.vue'
+import SourcePanel from './components/SourcePanel.vue'
 import TVPanel from './views/TVPanel.vue'
 import ImagePreview from './components/ImagePreview.vue'
 import TvConnectionModal from './components/TvConnectionModal.vue'
