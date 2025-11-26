@@ -75,13 +75,20 @@ class MetClient:
             return None
 
     def batch_fetch_objects(self, object_ids: list[int]) -> list[dict]:
-        """Fetch multiple objects, filtering those without images."""
+        """Fetch multiple objects, filtering those without images and deduplicating by image URL."""
         results = []
+        seen_images = set()
         for obj_id in object_ids:
             obj = self.get_object(obj_id)
             if obj and (obj.get("primaryImage") or obj.get("primaryImageSmall")):
                 # Normalize to simpler format for frontend
                 primary = obj.get("primaryImage") or obj.get("primaryImageSmall")
+
+                # Skip duplicate images (different objects can share same photo)
+                if primary in seen_images:
+                    continue
+                seen_images.add(primary)
+
                 is_low_res = not obj.get("primaryImage")
                 results.append({
                     "object_id": obj.get("objectID"),
