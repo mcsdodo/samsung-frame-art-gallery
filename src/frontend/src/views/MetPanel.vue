@@ -2,9 +2,35 @@
   <div class="met-panel">
     <div class="panel-header">
       <h2>Metropolitan Museum of Art</h2>
-      <div class="department-select">
-        <select v-model="selectedDepartment" @change="loadArtwork()">
-          <option :value="null">Highlights</option>
+      <div class="header-controls">
+        <div class="search-box">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search artwork..."
+            @input="onSearchInput"
+            @keyup.enter="doSearch"
+          />
+          <button
+            v-if="searchQuery"
+            class="clear-search"
+            @click="clearSearch"
+            title="Clear search"
+          >&times;</button>
+        </div>
+        <select v-model="selectedMedium" @change="onFilterChange">
+          <option value="Paintings">Paintings</option>
+          <option value="Sculpture">Sculpture</option>
+          <option value="Photographs">Photographs</option>
+          <option value="Drawings">Drawings</option>
+          <option value="Prints">Prints</option>
+          <option value="Ceramics">Ceramics</option>
+          <option value="Textiles">Textiles</option>
+          <option value="Furniture">Furniture</option>
+          <option value="">All Media</option>
+        </select>
+        <select v-model="selectedDepartment" @change="onFilterChange">
+          <option :value="null">All Departments</option>
           <option
             v-for="dept in departments"
             :key="dept.departmentId"
@@ -70,6 +96,7 @@ const emit = defineEmits(['uploaded', 'preview'])
 
 const departments = ref([])
 const selectedDepartment = ref(null)
+const selectedMedium = ref('Paintings') // Default to Paintings
 const artwork = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
@@ -79,6 +106,11 @@ const matte = ref({ style: 'none', color: 'neutral' })
 const currentPage = ref(1)
 const hasMore = ref(false)
 const totalCount = ref(0)
+
+// Search state
+const searchQuery = ref('')
+const activeSearch = ref('')
+let searchDebounceTimer = null
 
 const showResolutionWarning = ref(false)
 const pendingUpload = ref({ display: false })
@@ -118,9 +150,37 @@ const loadArtwork = async (append = false) => {
   }
 
   try {
-    const endpoint = selectedDepartment.value
-      ? `/api/met/objects?department_id=${selectedDepartment.value}&page=${currentPage.value}`
-      : `/api/met/highlights?page=${currentPage.value}`
+    let endpoint
+
+    if (activeSearch.value) {
+      // Search mode
+      const params = new URLSearchParams({
+        q: activeSearch.value,
+        page: currentPage.value
+      })
+      if (selectedDepartment.value) {
+        params.set('department_id', selectedDepartment.value)
+      }
+      if (selectedMedium.value) {
+        params.set('medium', selectedMedium.value)
+      }
+      endpoint = `/api/met/search?${params}`
+    } else if (selectedMedium.value) {
+      // Medium browse mode (default: Paintings)
+      const params = new URLSearchParams({
+        page: currentPage.value
+      })
+      if (selectedDepartment.value) {
+        params.set('department_id', selectedDepartment.value)
+      }
+      endpoint = `/api/met/medium/${encodeURIComponent(selectedMedium.value)}?${params}`
+    } else if (selectedDepartment.value) {
+      // Department browse mode
+      endpoint = `/api/met/objects?department_id=${selectedDepartment.value}&page=${currentPage.value}`
+    } else {
+      // All artworks (no filter)
+      endpoint = `/api/met/highlights?page=${currentPage.value}`
+    }
 
     const res = await fetch(endpoint)
     const data = await res.json()
@@ -148,6 +208,40 @@ const loadArtwork = async (append = false) => {
     loading.value = false
     loadingMore.value = false
   }
+}
+
+// Search functions
+const onSearchInput = () => {
+  // Debounce search input
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+  searchDebounceTimer = setTimeout(() => {
+    doSearch()
+  }, 500)
+}
+
+const doSearch = () => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  activeSearch.value = searchQuery.value.trim()
+  loadArtwork()
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  activeSearch.value = ''
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  loadArtwork()
+}
+
+const onFilterChange = () => {
+  loadArtwork()
 }
 
 const loadMore = async () => {
@@ -242,6 +336,8 @@ defineExpose({ loadMore, hasMore })
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #2a2a4e;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .panel-header h2 {
@@ -249,7 +345,54 @@ defineExpose({ loadMore, hasMore })
   margin: 0;
 }
 
-.department-select select {
+.header-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box input {
+  padding: 0.4rem 1.8rem 0.4rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #3a3a5e;
+  background: #2a2a4e;
+  color: white;
+  width: 180px;
+  font-size: 0.9rem;
+}
+
+.search-box input::placeholder {
+  color: #666;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.clear-search {
+  position: absolute;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.clear-search:hover {
+  color: white;
+}
+
+.header-controls select {
   padding: 0.4rem;
   border-radius: 4px;
   border: 1px solid #3a3a5e;

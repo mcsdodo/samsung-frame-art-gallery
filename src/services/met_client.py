@@ -118,10 +118,37 @@ class MetClient:
         self._set_cached(cache_key, object_ids, self._objects_ttl)
         return object_ids
 
-    def get_highlights(self, page: int = 1, page_size: int = 24) -> dict:
+    def get_highlights(self, page: int = 1, page_size: int = 24, medium: Optional[str] = None) -> dict:
         """Get highlighted artworks with images, paginated."""
-        cache_key = "highlights:ids"
-        url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+        if medium:
+            cache_key = f"highlights:{medium}:ids"
+            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
+        else:
+            cache_key = "highlights:ids"
+            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+        all_ids = self._get_object_ids(url, cache_key)
+
+        total = len(all_ids)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_ids = all_ids[start:end]
+
+        objects = self.batch_fetch_objects(page_ids)
+
+        return {
+            "objects": objects,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_more": end < total
+        }
+
+    def get_by_medium(self, medium: str, page: int = 1, page_size: int = 24) -> dict:
+        """Get artworks by medium (e.g., Paintings, Sculpture), paginated."""
+        import urllib.parse
+        encoded_medium = urllib.parse.quote(medium)
+        cache_key = f"medium:{medium}:ids"
+        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -158,6 +185,44 @@ class MetClient:
             "page": page,
             "page_size": page_size,
             "has_more": end < total
+        }
+
+    def search(self, query: str, department_id: Optional[int] = None, medium: Optional[str] = None, page: int = 1, page_size: int = 24) -> dict:
+        """Search artworks by keyword, optionally filtered by department or medium."""
+        import urllib.parse
+        encoded_query = urllib.parse.quote(query)
+
+        # Build cache key and URL
+        params = [f"hasImages=true", f"q={encoded_query}"]
+        cache_parts = [f"search:{query}"]
+
+        if department_id:
+            params.append(f"departmentId={department_id}")
+            cache_parts.append(f"dept:{department_id}")
+        if medium:
+            encoded_medium = urllib.parse.quote(medium)
+            params.append(f"medium={encoded_medium}")
+            cache_parts.append(f"medium:{medium}")
+
+        cache_key = ":".join(cache_parts) + ":ids"
+        url = f"{MET_API_BASE}/search?" + "&".join(params)
+
+        all_ids = self._get_object_ids(url, cache_key)
+
+        total = len(all_ids)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_ids = all_ids[start:end]
+
+        objects = self.batch_fetch_objects(page_ids)
+
+        return {
+            "objects": objects,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_more": end < total,
+            "query": query
         }
 
     def fetch_image(self, image_url: str) -> bytes:
