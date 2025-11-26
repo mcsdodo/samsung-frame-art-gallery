@@ -95,6 +95,60 @@ class MetClient:
                 })
         return results
 
+    def _get_object_ids(self, endpoint: str, cache_key: str) -> list[int]:
+        """Fetch and cache object IDs from search/objects endpoint."""
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        data = self._fetch_json(endpoint)
+        object_ids = data.get("objectIDs") or []
+        # Cache for 1 hour
+        self._set_cached(cache_key, object_ids, self._objects_ttl)
+        return object_ids
+
+    def get_highlights(self, page: int = 1, page_size: int = 24) -> dict:
+        """Get highlighted artworks with images, paginated."""
+        cache_key = "highlights:ids"
+        url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+        all_ids = self._get_object_ids(url, cache_key)
+
+        total = len(all_ids)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_ids = all_ids[start:end]
+
+        objects = self.batch_fetch_objects(page_ids)
+
+        return {
+            "objects": objects,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_more": end < total
+        }
+
+    def get_by_department(self, department_id: int, page: int = 1, page_size: int = 24) -> dict:
+        """Get artworks by department with images, paginated."""
+        cache_key = f"department:{department_id}:ids"
+        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true&q=*"
+        all_ids = self._get_object_ids(url, cache_key)
+
+        total = len(all_ids)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_ids = all_ids[start:end]
+
+        objects = self.batch_fetch_objects(page_ids)
+
+        return {
+            "objects": objects,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_more": end < total
+        }
+
 
 # Singleton instance
 _client: Optional[MetClient] = None
