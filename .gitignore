@@ -49,5 +49,8 @@ Thumbs.db
 # Thumbnails cache (managed by Docker volume)
 thumbnails/
 
+# Persistent TV settings (managed by Docker volume)
+data/
+
 # Claude settings (local only)
 .claude/settings.local.json
