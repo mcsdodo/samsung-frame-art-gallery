@@ -194,8 +194,8 @@ async def preview_processed(request: PreviewRequest):
             previews.append({
                 "id": path,
                 "name": image_path.name,
-                "original": base64.b64encode(original).decode('utf-8'),
-                "processed": base64.b64encode(processed).decode('utf-8')
+                "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
+                "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
             })
         except Exception as e:
             pass  # Skip failed previews silently

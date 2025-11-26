@@ -99,8 +99,8 @@ async def preview_met_artwork(request: MetPreviewRequest):
             previews.append({
                 "id": object_id,
                 "name": obj.get("title", "Untitled"),
-                "original": base64.b64encode(original).decode('utf-8'),
-                "processed": base64.b64encode(processed).decode('utf-8')
+                "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
+                "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
             })
         except Exception as e:
             pass  # Skip failed previews silently
