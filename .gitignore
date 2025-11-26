@@ -54,3 +54,6 @@ data/
 
 # Claude settings (local only)
 .claude/settings.local.json
+
+
+_conversation_exports/
