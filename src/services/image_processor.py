@@ -1,9 +1,10 @@
 """Image processing for TV upload: cropping and auto-matte."""
 import io
+import os
 from PIL import Image
 
 TARGET_RATIO = 16 / 9  # Samsung Frame TV aspect ratio
-MIN_MATTE_PERCENT = 0.12  # 12% of longer side
+MIN_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10")) / 100
 
 
 def process_for_tv(image_data: bytes, crop_percent: int = 0) -> bytes:

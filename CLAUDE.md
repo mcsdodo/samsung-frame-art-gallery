@@ -126,3 +126,5 @@ npm run build
 # Development environments
 1. for development use docker-compose file
 2. for deployment on a server use passwordless ssh ``ssh root@192.168.0.99`` and run the docker commands there
+3. caddy proxy sits here ``ssh root@192.168.0.112``. DO NOT MAKE ANY CHANGES WITHOUT CONSULTING ME FIRST. You can check the logs if needed.
+4. DO NOT make any changes on the caddy instance 192.168.0.22 without asking first.
