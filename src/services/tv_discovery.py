@@ -12,11 +12,13 @@ SSDP_ADDR = "239.255.255.250"
 SSDP_PORT = 1900
 SSDP_TIMEOUT = 3
 
+# Use ssdp:all to find all UPnP devices, then filter for Samsung
+# Samsung Frame TVs advertise as MediaRenderer, not RemoteControlReceiver
 SEARCH_REQUEST = """M-SEARCH * HTTP/1.1\r
 HOST: 239.255.255.250:1900\r
 MAN: "ssdp:discover"\r
 MX: 2\r
-ST: urn:samsung.com:device:RemoteControlReceiver:1\r
+ST: ssdp:all\r
 \r
 """
 
