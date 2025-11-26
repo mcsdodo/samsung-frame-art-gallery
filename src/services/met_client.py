@@ -8,6 +8,7 @@ import json
 _LOGGER = logging.getLogger(__name__)
 
 MET_API_BASE = "https://collectionapi.metmuseum.org/public/collection/v1"
+MET_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 
 @dataclass
@@ -40,7 +41,10 @@ class MetClient:
         _LOGGER.debug(f"Fetching: {url}")
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "SamsungFrameArtGallery/1.0"}
+            headers={
+                "User-Agent": MET_USER_AGENT,
+                "Accept": "application/json",
+            }
         )
         with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode())
@@ -244,7 +248,10 @@ class MetClient:
         _LOGGER.info(f"Downloading image: {image_url}")
         req = urllib.request.Request(
             image_url,
-            headers={"User-Agent": "SamsungFrameArtGallery/1.0"}
+            headers={
+                "User-Agent": MET_USER_AGENT,
+                "Accept": "image/*",
+            }
         )
         with urllib.request.urlopen(req, timeout=30) as response:
             return response.read()
