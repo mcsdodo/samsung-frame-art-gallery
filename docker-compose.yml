@@ -6,11 +6,11 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - c:\_dev\dezoomify-processor\output\:/images:ro
+      - ${IMAGES_DIR:-./images}:/images:ro
       - thumbnails:/thumbnails
       - ./data:/app/data
     environment:
-      - TV_IP=${TV_IP:-192.168.0.105}
+      - TV_IP=${TV_IP:-}
     restart: unless-stopped
 
 volumes:

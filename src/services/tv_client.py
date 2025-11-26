@@ -99,8 +99,23 @@ class TVClient:
             return {"connected": False, "error": str(e), "tv_ip": self._ip}
 
     def get_artwork_list(self) -> list:
+        """Get artwork list from TV, deduplicated by content_id."""
         tv = self._get_tv()
-        return tv.art().available() or []
+        artwork = tv.art().available() or []
+
+        # Deduplicate by content_id (TV sometimes returns duplicates)
+        seen = set()
+        unique = []
+        for item in artwork:
+            content_id = item.get("content_id")
+            if content_id and content_id not in seen:
+                seen.add(content_id)
+                unique.append(item)
+
+        if len(artwork) != len(unique):
+            _LOGGER.warning(f"Removed {len(artwork) - len(unique)} duplicate(s) from artwork list (raw: {len(artwork)}, unique: {len(unique)})")
+
+        return unique
 
     def get_current_artwork(self) -> dict:
         tv = self._get_tv()
