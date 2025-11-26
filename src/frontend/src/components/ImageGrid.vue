@@ -8,7 +8,7 @@
             :checked="allSelected"
             @change="$emit('select-all', $event.target.checked)"
           />
-          Select All ({{ selectedCount }}/{{ images.length }})
+          Select All ({{ selectedCount }}/{{ displayTotal }})
         </label>
         <button
           v-if="selectedCount > 0"
@@ -38,7 +38,12 @@
         @toggle="$emit('toggle', image)"
         @preview="$emit('preview', image)"
       />
-      <div v-if="hasMore" ref="sentinelRef" class="load-more-sentinel"></div>
+      <div v-if="hasMore" ref="sentinelRef" class="load-more-sentinel">
+        <div v-if="loadingMore" class="loading-spinner">
+          <div class="spinner"></div>
+          <span>Loading more...</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -54,8 +59,10 @@ const props = defineProps({
   selectedIds: { type: Set, default: () => new Set() },
   currentId: { type: String, default: null },
   loading: { type: Boolean, default: false },
+  loadingMore: { type: Boolean, default: false },
   isLocal: { type: Boolean, default: true },
-  hasMoreExternal: { type: Boolean, default: false }
+  hasMoreExternal: { type: Boolean, default: false },
+  totalCount: { type: Number, default: null }
 })
 
 const emit = defineEmits(['toggle', 'select-all', 'preview', 'load-more'])
@@ -72,6 +79,7 @@ const visibleImages = computed(() => props.images.slice(0, displayCount.value))
 const hasMoreInternal = computed(() => displayCount.value < props.images.length)
 const hasMore = computed(() => hasMoreInternal.value || props.hasMoreExternal)
 const selectedCount = computed(() => props.selectedIds.size)
+const displayTotal = computed(() => props.totalCount ?? props.images.length)
 const allSelected = computed(() =>
   props.images.length > 0 && props.selectedIds.size === props.images.length
 )
@@ -198,8 +206,34 @@ onUnmounted(() => {
 }
 
 .load-more-sentinel {
-  height: 1px;
   grid-column: 1 / -1;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #888;
+  padding: 1rem;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #333;
+  border-top-color: #4a90d9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading, .empty {

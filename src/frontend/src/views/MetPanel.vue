@@ -20,8 +20,10 @@
       :images="artwork"
       :selected-ids="selectedIds"
       :loading="loading"
+      :loading-more="loadingMore"
       :is-local="false"
       :has-more-external="hasMore"
+      :total-count="totalCount"
       @toggle="toggleSelection"
       @select-all="selectAll"
       @preview="(img) => $emit('preview', img)"
@@ -71,10 +73,12 @@ const selectedDepartment = ref(null)
 const artwork = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
+const loadingMore = ref(false)
 const uploading = ref(false)
 const matte = ref({ style: 'none', color: 'neutral' })
 const currentPage = ref(1)
 const hasMore = ref(false)
+const totalCount = ref(0)
 
 const showResolutionWarning = ref(false)
 const pendingUpload = ref({ display: false })
@@ -104,9 +108,15 @@ const loadArtwork = async (append = false) => {
   if (!append) {
     currentPage.value = 1
     artwork.value = []
+    totalCount.value = 0
   }
 
-  loading.value = true
+  if (append) {
+    loadingMore.value = true
+  } else {
+    loading.value = true
+  }
+
   try {
     const endpoint = selectedDepartment.value
       ? `/api/met/objects?department_id=${selectedDepartment.value}&page=${currentPage.value}`
@@ -131,15 +141,17 @@ const loadArtwork = async (append = false) => {
     }
 
     hasMore.value = data.has_more
+    totalCount.value = data.total || artwork.value.length
   } catch (e) {
     console.error('Failed to load artwork:', e)
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
 const loadMore = async () => {
-  if (hasMore.value && !loading.value) {
+  if (hasMore.value && !loading.value && !loadingMore.value) {
     currentPage.value++
     await loadArtwork(true)
   }
