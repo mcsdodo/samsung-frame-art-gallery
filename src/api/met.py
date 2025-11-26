@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import asyncio
+import base64
 
 from src.services.met_client import get_met_client
 from src.services.tv_client import get_tv_client, TVClient
+from src.services.image_processor import generate_preview, process_for_tv
 
 router = APIRouter()
 
@@ -62,16 +64,56 @@ async def get_object(object_id: int):
     return obj
 
 
+class MetPreviewRequest(BaseModel):
+    object_ids: list[int]
+    crop_percent: int = 0
+
+
 class MetUploadRequest(BaseModel):
     object_ids: list[int]
-    matte_style: str = "none"
-    matte_color: str = "neutral"
+    crop_percent: int = 0
     display: bool = False
+
+
+@router.post("/preview")
+async def preview_met_artwork(request: MetPreviewRequest):
+    """Generate preview of processed Met artwork (cropped + matted)."""
+    met_client = get_met_client()
+    results = []
+
+    for object_id in request.object_ids:
+        try:
+            obj = await asyncio.to_thread(met_client.get_object, object_id)
+            if not obj:
+                results.append({"object_id": object_id, "success": False, "error": "Object not found"})
+                continue
+
+            image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
+            if not image_url:
+                results.append({"object_id": object_id, "success": False, "error": "No image available"})
+                continue
+
+            image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
+            original, processed = await asyncio.to_thread(
+                generate_preview, image_data, request.crop_percent
+            )
+
+            results.append({
+                "object_id": object_id,
+                "success": True,
+                "title": obj.get("title", "Untitled"),
+                "original": base64.b64encode(original).decode('utf-8'),
+                "processed": base64.b64encode(processed).decode('utf-8')
+            })
+        except Exception as e:
+            results.append({"object_id": object_id, "success": False, "error": str(e)})
+
+    return {"results": results}
 
 
 @router.post("/upload")
 async def upload_met_artwork(request: MetUploadRequest):
-    """Download Met artwork and upload to TV."""
+    """Download Met artwork, process, and upload to TV."""
     met_client = get_met_client()
     tv_client = require_tv_client()
 
@@ -93,13 +135,16 @@ async def upload_met_artwork(request: MetUploadRequest):
             # Download image
             image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
 
+            # Process image (crop + matte)
+            processed_data = await asyncio.to_thread(
+                process_for_tv, image_data, request.crop_percent
+            )
+
             # Upload to TV
             display_this = request.display and object_id == request.object_ids[-1]
             result = await asyncio.to_thread(
                 tv_client.upload_artwork,
-                image_data,
-                request.matte_style,
-                request.matte_color,
+                processed_data,
                 display_this
             )
 

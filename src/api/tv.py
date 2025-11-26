@@ -6,10 +6,12 @@ from pathlib import Path
 import os
 import asyncio
 import time
+import base64
 
 from src.services.tv_client import get_tv_client, TVClient
 from src.services.tv_settings import load_settings, save_settings, TVSettings
 from src.services.tv_discovery import discover_tvs
+from src.services.image_processor import process_for_tv, generate_preview
 
 router = APIRouter()
 
@@ -35,10 +37,14 @@ class SetCurrentRequest(BaseModel):
     content_id: str
 
 
+class PreviewRequest(BaseModel):
+    paths: list[str]
+    crop_percent: int = 0
+
+
 class UploadRequest(BaseModel):
     paths: list[str]
-    matte_style: str = "none"
-    matte_color: str = "neutral"
+    crop_percent: int = 0
     display: bool = False
 
 
@@ -115,12 +121,6 @@ async def get_status():
     return status
 
 
-@router.get("/mattes")
-async def get_mattes():
-    client = require_tv_client()
-    return client.get_matte_options()
-
-
 @router.get("/artwork")
 async def list_artwork():
     client = require_tv_client()
@@ -175,6 +175,35 @@ async def get_artwork_thumbnail(content_id: str):
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@router.post("/preview")
+async def preview_processed(request: PreviewRequest):
+    """Generate preview of processed images (cropped + matted)."""
+    results = []
+
+    for path in request.paths:
+        try:
+            image_path = get_safe_path(path)
+            if not image_path.exists():
+                results.append({"path": path, "success": False, "error": "File not found"})
+                continue
+
+            image_data = image_path.read_bytes()
+            original, processed = await asyncio.to_thread(
+                generate_preview, image_data, request.crop_percent
+            )
+
+            results.append({
+                "path": path,
+                "success": True,
+                "original": base64.b64encode(original).decode('utf-8'),
+                "processed": base64.b64encode(processed).decode('utf-8')
+            })
+        except Exception as e:
+            results.append({"path": path, "success": False, "error": str(e)})
+
+    return {"results": results}
+
+
 @router.post("/upload")
 async def upload_artwork(request: UploadRequest):
     client = require_tv_client()
@@ -188,12 +217,16 @@ async def upload_artwork(request: UploadRequest):
                 continue
 
             image_data = image_path.read_bytes()
+
+            # Process image (crop + matte)
+            processed_data = await asyncio.to_thread(
+                process_for_tv, image_data, request.crop_percent
+            )
+
             # Run blocking TV upload in thread pool
             result = await asyncio.to_thread(
                 client.upload_artwork,
-                image_data,
-                request.matte_style,
-                request.matte_color,
+                processed_data,
                 request.display and len(request.paths) == 1
             )
             results.append({"path": path, "success": True, "result": result})

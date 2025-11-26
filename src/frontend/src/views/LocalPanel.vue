@@ -25,7 +25,11 @@
 
     <ActionBar>
       <template #left>
-        <MatteSelector @change="matte = $event" />
+        <CropSettings
+          :has-selection="selectedIds.size > 0"
+          @change="cropPercent = $event"
+          @preview="loadPreviews"
+        />
       </template>
       <button
         class="secondary"
@@ -42,6 +46,15 @@
         Upload & Display
       </button>
     </ActionBar>
+
+    <PreviewModal
+      v-if="showPreview"
+      :previews="previews"
+      :crop-percent="cropPercent"
+      :loading="previewLoading"
+      @close="showPreview = false"
+      @upload="uploadFromPreview"
+    />
   </div>
 </template>
 
@@ -49,7 +62,8 @@
 import { ref, watch, onMounted } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
-import MatteSelector from '../components/MatteSelector.vue'
+import CropSettings from '../components/CropSettings.vue'
+import PreviewModal from '../components/PreviewModal.vue'
 
 const emit = defineEmits(['uploaded', 'preview'])
 
@@ -59,7 +73,10 @@ const currentFolder = ref(null)
 const selectedIds = ref(new Set())
 const loading = ref(false)
 const uploading = ref(false)
-const matte = ref({ style: 'none', color: 'neutral' })
+const cropPercent = ref(0)
+const showPreview = ref(false)
+const previewLoading = ref(false)
+const previews = ref([])
 
 const loadImages = async () => {
   loading.value = true
@@ -106,6 +123,36 @@ const selectAll = (checked) => {
   }
 }
 
+const loadPreviews = async () => {
+  if (selectedIds.value.size === 0) return
+
+  showPreview.value = true
+  previewLoading.value = true
+  previews.value = []
+
+  try {
+    const res = await fetch('/api/tv/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paths: Array.from(selectedIds.value),
+        crop_percent: cropPercent.value
+      })
+    })
+    const data = await res.json()
+    previews.value = data.previews || []
+  } catch (e) {
+    console.error('Preview failed:', e)
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const uploadFromPreview = async () => {
+  showPreview.value = false
+  await upload(false)
+}
+
 const upload = async (display) => {
   if (selectedIds.value.size === 0) return
 
@@ -116,8 +163,7 @@ const upload = async (display) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         paths: Array.from(selectedIds.value),
-        matte_style: matte.value.style,
-        matte_color: matte.value.color,
+        crop_percent: cropPercent.value,
         display
       })
     })
