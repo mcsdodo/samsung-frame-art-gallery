@@ -143,12 +143,16 @@ class MetClient:
             "has_more": end < total
         }
 
-    def get_by_medium(self, medium: str, page: int = 1, page_size: int = 24) -> dict:
+    def get_by_medium(self, medium: str, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
         """Get artworks by medium (e.g., Paintings, Sculpture), paginated."""
         import urllib.parse
         encoded_medium = urllib.parse.quote(medium)
-        cache_key = f"medium:{medium}:ids"
-        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}&q=*"
+
+        highlight_suffix = ":highlights" if highlights_only else ""
+        cache_key = f"medium:{medium}{highlight_suffix}:ids"
+
+        highlight_param = "&isHighlight=true" if highlights_only else ""
+        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -166,10 +170,13 @@ class MetClient:
             "has_more": end < total
         }
 
-    def get_by_department(self, department_id: int, page: int = 1, page_size: int = 24) -> dict:
+    def get_by_department(self, department_id: int, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
         """Get artworks by department with images, paginated."""
-        cache_key = f"department:{department_id}:ids"
-        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true&q=*"
+        highlight_suffix = ":highlights" if highlights_only else ""
+        cache_key = f"department:{department_id}{highlight_suffix}:ids"
+
+        highlight_param = "&isHighlight=true" if highlights_only else ""
+        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -187,8 +194,8 @@ class MetClient:
             "has_more": end < total
         }
 
-    def search(self, query: str, department_id: Optional[int] = None, medium: Optional[str] = None, page: int = 1, page_size: int = 24) -> dict:
-        """Search artworks by keyword, optionally filtered by department or medium."""
+    def search(self, query: str, department_id: Optional[int] = None, medium: Optional[str] = None, highlights_only: bool = False, page: int = 1, page_size: int = 24) -> dict:
+        """Search artworks by keyword, optionally filtered by department, medium, or highlights."""
         import urllib.parse
         encoded_query = urllib.parse.quote(query)
 
@@ -203,6 +210,9 @@ class MetClient:
             encoded_medium = urllib.parse.quote(medium)
             params.append(f"medium={encoded_medium}")
             cache_parts.append(f"medium:{medium}")
+        if highlights_only:
+            params.append("isHighlight=true")
+            cache_parts.append("highlights")
 
         cache_key = ":".join(cache_parts) + ":ids"
         url = f"{MET_API_BASE}/search?" + "&".join(params)

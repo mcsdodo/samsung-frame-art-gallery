@@ -32,24 +32,24 @@ async def get_highlights(page: int = 1, page_size: int = 48, medium: str = None)
 
 
 @router.get("/medium/{medium}")
-async def get_by_medium(medium: str, page: int = 1, page_size: int = 48):
+async def get_by_medium(medium: str, page: int = 1, page_size: int = 48, highlights: bool = False):
     """Get artworks by medium (e.g., Paintings, Sculpture), paginated."""
     client = get_met_client()
-    return await asyncio.to_thread(client.get_by_medium, medium, page, page_size)
+    return await asyncio.to_thread(client.get_by_medium, medium, page, page_size, highlights)
 
 
 @router.get("/objects")
-async def get_objects(department_id: int, page: int = 1, page_size: int = 48):
+async def get_objects(department_id: int, page: int = 1, page_size: int = 48, highlights: bool = False):
     """Get artworks by department, paginated."""
     client = get_met_client()
-    return await asyncio.to_thread(client.get_by_department, department_id, page, page_size)
+    return await asyncio.to_thread(client.get_by_department, department_id, page, page_size, highlights)
 
 
 @router.get("/search")
-async def search_objects(q: str, department_id: int = None, medium: str = None, page: int = 1, page_size: int = 48):
-    """Search artworks by keyword, optionally filtered by department or medium."""
+async def search_objects(q: str, department_id: int = None, medium: str = None, highlights: bool = False, page: int = 1, page_size: int = 48):
+    """Search artworks by keyword, optionally filtered by department, medium, or highlights."""
     client = get_met_client()
-    return await asyncio.to_thread(client.search, q, department_id, medium, page, page_size)
+    return await asyncio.to_thread(client.search, q, department_id, medium, highlights, page, page_size)
 
 
 @router.get("/object/{object_id}")

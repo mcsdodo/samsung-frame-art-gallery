@@ -39,6 +39,14 @@
             {{ dept.displayName }}
           </option>
         </select>
+        <label class="highlights-filter">
+          <input
+            type="checkbox"
+            v-model="highlightsOnly"
+            @change="onFilterChange"
+          />
+          Highlights
+        </label>
       </div>
     </div>
 
@@ -97,6 +105,7 @@ const emit = defineEmits(['uploaded', 'preview'])
 const departments = ref([])
 const selectedDepartment = ref(null)
 const selectedMedium = ref('Paintings') // Default to Paintings
+const highlightsOnly = ref(true) // Default to highlights only
 const artwork = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
@@ -164,6 +173,9 @@ const loadArtwork = async (append = false) => {
       if (selectedMedium.value) {
         params.set('medium', selectedMedium.value)
       }
+      if (highlightsOnly.value) {
+        params.set('highlights', 'true')
+      }
       endpoint = `/api/met/search?${params}`
     } else if (selectedMedium.value) {
       // Medium browse mode (default: Paintings)
@@ -173,12 +185,22 @@ const loadArtwork = async (append = false) => {
       if (selectedDepartment.value) {
         params.set('department_id', selectedDepartment.value)
       }
+      if (highlightsOnly.value) {
+        params.set('highlights', 'true')
+      }
       endpoint = `/api/met/medium/${encodeURIComponent(selectedMedium.value)}?${params}`
     } else if (selectedDepartment.value) {
       // Department browse mode
-      endpoint = `/api/met/objects?department_id=${selectedDepartment.value}&page=${currentPage.value}`
+      const params = new URLSearchParams({
+        department_id: selectedDepartment.value,
+        page: currentPage.value
+      })
+      if (highlightsOnly.value) {
+        params.set('highlights', 'true')
+      }
+      endpoint = `/api/met/objects?${params}`
     } else {
-      // All artworks (no filter)
+      // All artworks (no filter) - use highlights endpoint
       endpoint = `/api/met/highlights?page=${currentPage.value}`
     }
 
@@ -398,5 +420,21 @@ defineExpose({ loadMore, hasMore })
   border: 1px solid #3a3a5e;
   background: #2a2a4e;
   color: white;
+}
+
+.highlights-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.highlights-filter input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 </style>
