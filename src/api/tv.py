@@ -5,6 +5,7 @@ from typing import Optional
 from pathlib import Path
 import os
 import asyncio
+import time
 
 from src.services.tv_client import get_tv_client, TVClient
 from src.services.tv_settings import load_settings, save_settings, TVSettings
@@ -94,7 +95,6 @@ async def set_tv_settings(request: TVSettingsRequest):
 @router.get("/discover")
 async def discover_samsung_tvs():
     """Discover Samsung TVs on the network."""
-    import time
     start = time.time()
 
     tvs = await asyncio.to_thread(discover_tvs)
