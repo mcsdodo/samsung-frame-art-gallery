@@ -115,6 +115,9 @@ class TVClient:
         if len(artwork) != len(unique):
             _LOGGER.warning(f"Removed {len(artwork) - len(unique)} duplicate(s) from artwork list (raw: {len(artwork)}, unique: {len(unique)})")
 
+        # Cleanup orphaned thumbnails that are no longer on the TV
+        self._thumbnail_cache.cleanup_orphaned(seen)
+
         return unique
 
     def get_current_artwork(self) -> dict:
