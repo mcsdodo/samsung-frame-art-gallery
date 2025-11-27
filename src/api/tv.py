@@ -12,6 +12,7 @@ from src.services.tv_client import get_tv_client, TVClient
 from src.services.tv_settings import load_settings, save_settings, TVSettings
 from src.services.tv_discovery import discover_tvs
 from src.services.image_processor import process_for_tv, generate_preview
+from src.services.preview_cache import get_preview_cache
 
 router = APIRouter()
 
@@ -193,6 +194,7 @@ async def get_artwork_thumbnail(content_id: str):
 @router.post("/preview")
 async def preview_processed(request: PreviewRequest):
     """Generate preview of processed images (cropped + matted)."""
+    cache = get_preview_cache()
 
     async def process_single_preview(path: str):
         try:
@@ -200,10 +202,17 @@ async def preview_processed(request: PreviewRequest):
             if not image_path.exists():
                 return None
 
-            image_data = image_path.read_bytes()
-            original, processed = await asyncio.to_thread(
-                generate_preview, image_data, request.crop_percent, request.matte_percent
-            )
+            # Check cache first
+            cached = cache.get(path, request.crop_percent, request.matte_percent)
+            if cached:
+                original, processed = cached
+            else:
+                image_data = image_path.read_bytes()
+                original, processed = await asyncio.to_thread(
+                    generate_preview, image_data, request.crop_percent, request.matte_percent
+                )
+                # Store in cache
+                cache.set(path, request.crop_percent, request.matte_percent, original, processed)
 
             return {
                 "id": path,

@@ -6,6 +6,7 @@ import base64
 from src.services.met_client import get_met_client
 from src.services.tv_client import get_tv_client, TVClient
 from src.services.image_processor import generate_preview, process_for_tv
+from src.services.preview_cache import get_preview_cache
 
 router = APIRouter()
 
@@ -81,25 +82,40 @@ class MetUploadRequest(BaseModel):
 async def preview_met_artwork(request: MetPreviewRequest):
     """Generate preview of processed Met artwork (cropped + matted)."""
     met_client = get_met_client()
+    cache = get_preview_cache()
 
     async def process_single_preview(object_id: int):
         try:
-            obj = await asyncio.to_thread(met_client.get_object, object_id)
-            if not obj:
-                return None
+            # Use met:{object_id} as cache key to distinguish from local files
+            cache_key = f"met:{object_id}"
 
-            image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
-            if not image_url:
-                return None
+            # Check cache first
+            cached = cache.get(cache_key, request.crop_percent, request.matte_percent)
+            if cached:
+                original, processed = cached
+                # Still need object details for the name
+                obj = await asyncio.to_thread(met_client.get_object, object_id)
+                name = obj.get("title", "Untitled") if obj else "Untitled"
+            else:
+                obj = await asyncio.to_thread(met_client.get_object, object_id)
+                if not obj:
+                    return None
 
-            image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
-            original, processed = await asyncio.to_thread(
-                generate_preview, image_data, request.crop_percent, request.matte_percent
-            )
+                image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
+                if not image_url:
+                    return None
+
+                image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
+                original, processed = await asyncio.to_thread(
+                    generate_preview, image_data, request.crop_percent, request.matte_percent
+                )
+                # Store in cache
+                cache.set(cache_key, request.crop_percent, request.matte_percent, original, processed)
+                name = obj.get("title", "Untitled")
 
             return {
                 "id": object_id,
-                "name": obj.get("title", "Untitled"),
+                "name": name,
                 "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
                 "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
             }
