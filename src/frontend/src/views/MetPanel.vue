@@ -67,7 +67,7 @@
       <template #left>
         <CropSettings
           :has-selection="selectedIds.size > 0"
-          @change="setCropPercent"
+          @change="setSettings"
           @preview="loadPreviews"
         />
       </template>
@@ -91,6 +91,7 @@
       v-if="showPreview"
       :previews="previews"
       :crop-percent="cropPercent"
+      :matte-percent="mattePercent"
       :loading="previewLoading"
       @close="showPreview = false"
       @upload="uploadFromPreview"
@@ -138,6 +139,7 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const uploading = ref(false)
 const cropPercent = ref(0)
+const mattePercent = ref(10)
 const showPreview = ref(false)
 const previewLoading = ref(false)
 const previews = ref([])
@@ -357,8 +359,9 @@ const selectAll = (checked) => {
   }
 }
 
-const setCropPercent = (value) => {
-  cropPercent.value = value
+const setSettings = (settings) => {
+  cropPercent.value = settings.crop
+  mattePercent.value = settings.matte
 }
 
 // Get actual image dimensions by loading it
@@ -415,7 +418,8 @@ const loadPreviews = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         object_ids: Array.from(selectedIds.value),
-        crop_percent: cropPercent.value
+        crop_percent: cropPercent.value,
+        matte_percent: mattePercent.value
       })
     })
     const data = await res.json()
@@ -446,6 +450,7 @@ const doUpload = async (display) => {
       body: JSON.stringify({
         object_ids: Array.from(selectedIds.value),
         crop_percent: cropPercent.value,
+        matte_percent: mattePercent.value,
         display
       })
     })

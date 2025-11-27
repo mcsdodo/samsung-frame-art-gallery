@@ -12,6 +12,18 @@
       />
       <span class="unit">%</span>
     </div>
+    <div class="crop-field">
+      <label>Matte:</label>
+      <input
+        type="number"
+        v-model.number="matteValue"
+        min="0"
+        max="50"
+        step="1"
+        @input="emitChange"
+      />
+      <span class="unit">%</span>
+    </div>
     <button
       class="preview-btn"
       @click="$emit('preview')"
@@ -34,9 +46,10 @@ const props = defineProps({
 })
 
 const cropValue = ref(0)
+const matteValue = ref(10)
 
 const emitChange = () => {
-  emit('change', cropValue.value)
+  emit('change', { crop: cropValue.value, matte: matteValue.value })
 }
 
 onMounted(async () => {
@@ -45,10 +58,14 @@ onMounted(async () => {
     const data = await res.json()
     if (data.default_crop_percent !== undefined) {
       cropValue.value = data.default_crop_percent
-      emitChange()
     }
+    if (data.default_matte_percent !== undefined) {
+      matteValue.value = data.default_matte_percent
+    }
+    emitChange()
   } catch (e) {
-    // Use default of 0 if config fetch fails
+    // Use defaults if config fetch fails
+    emitChange()
   }
 })
 </script>

@@ -67,11 +67,13 @@ async def get_object(object_id: int):
 class MetPreviewRequest(BaseModel):
     object_ids: list[int]
     crop_percent: int = 0
+    matte_percent: int = 10
 
 
 class MetUploadRequest(BaseModel):
     object_ids: list[int]
     crop_percent: int = 0
+    matte_percent: int = 10
     display: bool = False
 
 
@@ -93,7 +95,7 @@ async def preview_met_artwork(request: MetPreviewRequest):
 
             image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
             original, processed = await asyncio.to_thread(
-                generate_preview, image_data, request.crop_percent
+                generate_preview, image_data, request.crop_percent, request.matte_percent
             )
 
             previews.append({
@@ -134,7 +136,7 @@ async def upload_met_artwork(request: MetUploadRequest):
 
             # Process image (crop + matte)
             processed_data = await asyncio.to_thread(
-                process_for_tv, image_data, request.crop_percent
+                process_for_tv, image_data, request.crop_percent, request.matte_percent
             )
 
             # Upload to TV

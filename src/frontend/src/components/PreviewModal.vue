@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Preview (Crop: {{ cropPercent }}%)</h2>
+        <h2>Preview (Crop: {{ cropPercent }}%, Matte: {{ mattePercent }}%)</h2>
         <button class="close-btn" @click="$emit('close')">&times;</button>
       </div>
 
@@ -55,6 +55,10 @@ const props = defineProps({
   cropPercent: {
     type: Number,
     default: 0
+  },
+  mattePercent: {
+    type: Number,
+    default: 10
   },
   loading: {
     type: Boolean,

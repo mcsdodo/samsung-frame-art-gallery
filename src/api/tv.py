@@ -41,11 +41,13 @@ class SetCurrentRequest(BaseModel):
 class PreviewRequest(BaseModel):
     paths: list[str]
     crop_percent: int = 0
+    matte_percent: int = 10
 
 
 class UploadRequest(BaseModel):
     paths: list[str]
     crop_percent: int = 0
+    matte_percent: int = 10
     display: bool = False
 
 
@@ -55,11 +57,15 @@ class TVSettingsRequest(BaseModel):
     manual_entry: bool = False
 
 
+DEFAULT_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10"))
+
+
 @router.get("/config")
 async def get_config():
     """Get app configuration including defaults."""
     return {
-        "default_crop_percent": DEFAULT_CROP_PERCENT
+        "default_crop_percent": DEFAULT_CROP_PERCENT,
+        "default_matte_percent": DEFAULT_MATTE_PERCENT
     }
 
 
@@ -197,7 +203,7 @@ async def preview_processed(request: PreviewRequest):
 
             image_data = image_path.read_bytes()
             original, processed = await asyncio.to_thread(
-                generate_preview, image_data, request.crop_percent
+                generate_preview, image_data, request.crop_percent, request.matte_percent
             )
 
             previews.append({
@@ -228,7 +234,7 @@ async def upload_artwork(request: UploadRequest):
 
             # Process image (crop + matte)
             processed_data = await asyncio.to_thread(
-                process_for_tv, image_data, request.crop_percent
+                process_for_tv, image_data, request.crop_percent, request.matte_percent
             )
 
             # Run blocking TV upload in thread pool

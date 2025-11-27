@@ -4,10 +4,10 @@ import os
 from PIL import Image
 
 TARGET_RATIO = 16 / 9  # Samsung Frame TV aspect ratio
-MIN_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10")) / 100
+DEFAULT_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10"))
 
 
-def process_for_tv(image_data: bytes, crop_percent: int = 0) -> bytes:
+def process_for_tv(image_data: bytes, crop_percent: int = 0, matte_percent: int = None) -> bytes:
     """
     Process image for TV display:
     1. Crop: Remove crop_percent from all 4 edges
@@ -16,10 +16,14 @@ def process_for_tv(image_data: bytes, crop_percent: int = 0) -> bytes:
     Args:
         image_data: Raw image bytes (JPEG/PNG)
         crop_percent: Percentage to crop from each edge (0-50)
+        matte_percent: Minimum matte as % of longer side (default from env)
 
     Returns:
         PNG bytes ready for TV upload
     """
+    if matte_percent is None:
+        matte_percent = DEFAULT_MATTE_PERCENT
+
     # Load image
     img = Image.open(io.BytesIO(image_data))
 
@@ -39,7 +43,7 @@ def process_for_tv(image_data: bytes, crop_percent: int = 0) -> bytes:
         img = _crop_image(img, crop_percent)
 
     # Step 2: Add matte for 16:9
-    img = _add_matte(img)
+    img = _add_matte(img, matte_percent)
 
     # Output as PNG
     output = io.BytesIO()
@@ -61,18 +65,18 @@ def _crop_image(img: Image.Image, crop_percent: int) -> Image.Image:
     return img.crop((left, top, right, bottom))
 
 
-def _add_matte(img: Image.Image) -> Image.Image:
+def _add_matte(img: Image.Image, matte_percent: int) -> Image.Image:
     """
     Add white matte padding to achieve 16:9 aspect ratio.
 
     Rules:
-    - Minimum matte = 12% of image's longer side (on all sides)
+    - Minimum matte = matte_percent of image's longer side (on all sides)
     - Expand as needed to reach 16:9
     - Image centered on white canvas
     """
     w, h = img.size
     longer_side = max(w, h)
-    min_matte = int(longer_side * MIN_MATTE_PERCENT)
+    min_matte = int(longer_side * matte_percent / 100)
 
     # Start with minimum matte on all sides
     canvas_w = w + (min_matte * 2)
@@ -97,7 +101,7 @@ def _add_matte(img: Image.Image) -> Image.Image:
     return canvas
 
 
-def generate_preview(image_data: bytes, crop_percent: int = 0) -> tuple[bytes, bytes]:
+def generate_preview(image_data: bytes, crop_percent: int = 0, matte_percent: int = None) -> tuple[bytes, bytes]:
     """
     Generate preview images for comparison.
 
@@ -114,7 +118,7 @@ def generate_preview(image_data: bytes, crop_percent: int = 0) -> tuple[bytes, b
     original.save(orig_output, format='JPEG', quality=85)
 
     # Processed thumbnail
-    processed_full = process_for_tv(image_data, crop_percent)
+    processed_full = process_for_tv(image_data, crop_percent, matte_percent)
     processed = Image.open(io.BytesIO(processed_full))
     processed.thumbnail((400, 400), Image.Resampling.LANCZOS)
 
