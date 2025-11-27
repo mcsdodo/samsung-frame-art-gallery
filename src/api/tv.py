@@ -193,27 +193,30 @@ async def get_artwork_thumbnail(content_id: str):
 @router.post("/preview")
 async def preview_processed(request: PreviewRequest):
     """Generate preview of processed images (cropped + matted)."""
-    previews = []
 
-    for path in request.paths:
+    async def process_single_preview(path: str):
         try:
             image_path = get_safe_path(path)
             if not image_path.exists():
-                continue
+                return None
 
             image_data = image_path.read_bytes()
             original, processed = await asyncio.to_thread(
                 generate_preview, image_data, request.crop_percent, request.matte_percent
             )
 
-            previews.append({
+            return {
                 "id": path,
                 "name": image_path.name,
                 "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
                 "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
-            })
-        except Exception as e:
-            pass  # Skip failed previews silently
+            }
+        except Exception:
+            return None  # Skip failed previews silently
+
+    # Process all previews in parallel
+    results = await asyncio.gather(*[process_single_preview(p) for p in request.paths])
+    previews = [p for p in results if p is not None]
 
     return {"previews": previews}
 
@@ -221,42 +224,42 @@ async def preview_processed(request: PreviewRequest):
 @router.post("/upload")
 async def upload_artwork(request: UploadRequest):
     client = require_tv_client()
-    results = []
 
-    for path in request.paths:
+    async def read_and_process(path: str):
+        """Read and process image in parallel, return processed data and metadata."""
         try:
             image_path = get_safe_path(path)
             if not image_path.exists():
-                results.append({"path": path, "success": False, "error": "File not found"})
-                continue
+                return {"path": path, "success": False, "error": "File not found"}
 
             image_data = image_path.read_bytes()
-
-            # Process image (crop + matte)
             processed_data = await asyncio.to_thread(
                 process_for_tv, image_data, request.crop_percent, request.matte_percent
             )
 
-            # Run blocking TV upload in thread pool
+            return {"path": path, "processed_data": processed_data}
+        except Exception as e:
+            return {"path": path, "success": False, "error": str(e)}
+
+    # Process all images in parallel
+    processed_items = await asyncio.gather(*[read_and_process(p) for p in request.paths])
+
+    # Upload sequentially (TV may not handle parallel uploads well)
+    results = []
+    for i, item in enumerate(processed_items):
+        if "success" in item and not item["success"]:
+            results.append(item)
+            continue
+
+        try:
+            display_this = request.display and i == len(processed_items) - 1
             result = await asyncio.to_thread(
                 client.upload_artwork,
-                processed_data,
-                request.display and len(request.paths) == 1
+                item["processed_data"],
+                display_this
             )
-            results.append({"path": path, "success": True, "result": result})
+            results.append({"path": item["path"], "success": True, "result": result})
         except Exception as e:
-            results.append({"path": path, "success": False, "error": str(e)})
-
-    # If display requested and multiple images, display the last one
-    if request.display and len(request.paths) > 1:
-        last_success = next((r for r in reversed(results) if r["success"]), None)
-        if last_success and "content_id" in last_success.get("result", {}):
-            try:
-                await asyncio.to_thread(
-                    client.set_current_artwork,
-                    last_success["result"]["content_id"]
-                )
-            except:
-                pass
+            results.append({"path": item["path"], "success": False, "error": str(e)})
 
     return {"results": results}

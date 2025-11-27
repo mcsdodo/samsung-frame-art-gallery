@@ -81,31 +81,34 @@ class MetUploadRequest(BaseModel):
 async def preview_met_artwork(request: MetPreviewRequest):
     """Generate preview of processed Met artwork (cropped + matted)."""
     met_client = get_met_client()
-    previews = []
 
-    for object_id in request.object_ids:
+    async def process_single_preview(object_id: int):
         try:
             obj = await asyncio.to_thread(met_client.get_object, object_id)
             if not obj:
-                continue
+                return None
 
             image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
             if not image_url:
-                continue
+                return None
 
             image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
             original, processed = await asyncio.to_thread(
                 generate_preview, image_data, request.crop_percent, request.matte_percent
             )
 
-            previews.append({
+            return {
                 "id": object_id,
                 "name": obj.get("title", "Untitled"),
                 "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
                 "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
-            })
-        except Exception as e:
-            pass  # Skip failed previews silently
+            }
+        except Exception:
+            return None  # Skip failed previews silently
+
+    # Process all previews in parallel
+    results = await asyncio.gather(*[process_single_preview(oid) for oid in request.object_ids])
+    previews = [p for p in results if p is not None]
 
     return {"previews": previews}
 
@@ -116,44 +119,55 @@ async def upload_met_artwork(request: MetUploadRequest):
     met_client = get_met_client()
     tv_client = require_tv_client()
 
-    results = []
-    for object_id in request.object_ids:
+    async def fetch_and_process(object_id: int):
+        """Fetch and process image in parallel, return processed data and metadata."""
         try:
-            # Get object details
             obj = await asyncio.to_thread(met_client.get_object, object_id)
             if not obj:
-                results.append({"object_id": object_id, "success": False, "error": "Object not found"})
-                continue
+                return {"object_id": object_id, "success": False, "error": "Object not found"}
 
-            # Get best available image URL
             image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
             if not image_url:
-                results.append({"object_id": object_id, "success": False, "error": "No image available"})
-                continue
+                return {"object_id": object_id, "success": False, "error": "No image available"}
 
-            # Download image
             image_data = await asyncio.to_thread(met_client.fetch_image, image_url)
-
-            # Process image (crop + matte)
             processed_data = await asyncio.to_thread(
                 process_for_tv, image_data, request.crop_percent, request.matte_percent
             )
 
-            # Upload to TV
-            display_this = request.display and object_id == request.object_ids[-1]
+            return {
+                "object_id": object_id,
+                "processed_data": processed_data,
+                "title": obj.get("title", "Untitled")
+            }
+        except Exception as e:
+            return {"object_id": object_id, "success": False, "error": str(e)}
+
+    # Fetch and process all images in parallel
+    processed_items = await asyncio.gather(*[fetch_and_process(oid) for oid in request.object_ids])
+
+    # Upload sequentially (TV may not handle parallel uploads well)
+    results = []
+    for i, item in enumerate(processed_items):
+        if "success" in item and not item["success"]:
+            results.append(item)
+            continue
+
+        try:
+            display_this = request.display and i == len(processed_items) - 1
             result = await asyncio.to_thread(
                 tv_client.upload_artwork,
-                processed_data,
+                item["processed_data"],
                 display_this
             )
 
             results.append({
-                "object_id": object_id,
+                "object_id": item["object_id"],
                 "success": True,
                 "content_id": result.get("content_id"),
-                "title": obj.get("title", "Untitled")
+                "title": item["title"]
             })
         except Exception as e:
-            results.append({"object_id": object_id, "success": False, "error": str(e)})
+            results.append({"object_id": item["object_id"], "success": False, "error": str(e)})
 
     return {"results": results}
