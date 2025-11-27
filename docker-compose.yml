@@ -7,7 +7,7 @@ services:
       - "8080:8080"
     volumes:
       - ${IMAGES_DIR:-./images}:/images:ro
-      - thumbnails:/thumbnails
+      - ./data/thumbnails:/thumbnails
       - ./data:/app/data
     environment:
       - TV_IP=${TV_IP:-}
@@ -30,7 +30,3 @@ services:
   #     - AGENT_ID=host3-remote
   #     - HOST_IP=192.168.0.99
   #     - DOCKER_LABEL_PREFIX=caddy
-
-volumes:
-  thumbnails:
-
