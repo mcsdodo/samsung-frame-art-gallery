@@ -29,6 +29,28 @@ A self-hosted web application for managing artwork on Samsung Frame TVs. Browse 
 - **Masonry Layout** - Beautiful variable-height image grid
 - **Docker-Ready** - Simple one-command deployment
 
+## Screenshots
+
+### Local Images with Masonry Layout
+Browse your image collection with a beautiful masonry grid and TV artwork panel.
+
+![Local Images](screenshots/01-local-images.png)
+
+### Met Museum Collection Search
+Search and browse public domain artwork from The Metropolitan Museum of Art.
+
+![Met Museum Search](screenshots/02-met-museum.png)
+
+### Preview with Crop & Matte
+See how your images will look with cropping and automatic matting before upload.
+
+![Preview Modal](screenshots/03-preview-modal.png)
+
+### Re-framing Mode
+Fill the entire frame with draggable positioning for single images.
+
+![Re-framing Preview](screenshots/04-reframe-preview.png)
+
 ## Quick Start
 
 ### Prerequisites
