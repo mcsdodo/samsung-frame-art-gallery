@@ -20,10 +20,10 @@
       <!-- Single image reframe mode with drag -->
       <div v-else-if="reframeEnabled && selectedPaths.length === 1" class="reframe-container">
         <div class="reframe-instructions">
-          Drag the image to position the crop area
+          Drag the image to position within the frame. Darkened areas will be cropped.
         </div>
         <div
-          class="reframe-viewport"
+          class="reframe-canvas"
           ref="viewportRef"
           @mousedown="startDrag"
           @touchstart="startDrag"
@@ -32,15 +32,13 @@
             v-if="originalImageUrl"
             :src="originalImageUrl"
             class="reframe-image"
-            :style="imageStyle"
+            :style="canvasImageStyle"
             draggable="false"
             @load="onImageLoad"
           />
-          <div class="frame-overlay">
-            <div class="frame-outside top"></div>
-            <div class="frame-outside bottom"></div>
-            <div class="frame-outside left"></div>
-            <div class="frame-outside right"></div>
+          <!-- Frame overlay showing crop boundaries -->
+          <div class="crop-overlay">
+            <div class="crop-window" :style="cropWindowStyle"></div>
           </div>
         </div>
       </div>
@@ -125,8 +123,80 @@ const dragStartOffsetX = ref(0)
 const dragStartOffsetY = ref(0)
 
 const TARGET_RATIO = 16 / 9
+const CANVAS_WIDTH = 800
+const CANVAS_HEIGHT = 500  // Larger than 16:9 to show context
 
-// Calculate image dimensions and position
+// Calculate image dimensions for the canvas view
+const canvasImageStyle = computed(() => {
+  if (!imageNaturalWidth.value || !imageNaturalHeight.value) return {}
+
+  const imgRatio = imageNaturalWidth.value / imageNaturalHeight.value
+
+  // Scale image to fit within canvas while showing full image
+  let imgDisplayWidth, imgDisplayHeight
+
+  if (imgRatio > CANVAS_WIDTH / CANVAS_HEIGHT) {
+    // Image is wider - fit to canvas width
+    imgDisplayWidth = CANVAS_WIDTH
+    imgDisplayHeight = CANVAS_WIDTH / imgRatio
+  } else {
+    // Image is taller - fit to canvas height
+    imgDisplayHeight = CANVAS_HEIGHT
+    imgDisplayWidth = CANVAS_HEIGHT * imgRatio
+  }
+
+  return {
+    width: `${imgDisplayWidth}px`,
+    height: `${imgDisplayHeight}px`
+  }
+})
+
+// Calculate crop window position and size
+const cropWindowStyle = computed(() => {
+  if (!imageNaturalWidth.value || !imageNaturalHeight.value) return {}
+
+  const imgRatio = imageNaturalWidth.value / imageNaturalHeight.value
+
+  // Get displayed image dimensions
+  let imgDisplayWidth, imgDisplayHeight
+  if (imgRatio > CANVAS_WIDTH / CANVAS_HEIGHT) {
+    imgDisplayWidth = CANVAS_WIDTH
+    imgDisplayHeight = CANVAS_WIDTH / imgRatio
+  } else {
+    imgDisplayHeight = CANVAS_HEIGHT
+    imgDisplayWidth = CANVAS_HEIGHT * imgRatio
+  }
+
+  // Calculate crop window size based on image aspect ratio
+  let cropWidth, cropHeight
+
+  if (imgRatio > TARGET_RATIO) {
+    // Image wider than 16:9 - crop window height = image height, width = height * 16/9
+    cropHeight = imgDisplayHeight
+    cropWidth = cropHeight * TARGET_RATIO
+  } else {
+    // Image taller than 16:9 - crop window width = image width, height = width / 16*9
+    cropWidth = imgDisplayWidth
+    cropHeight = cropWidth / TARGET_RATIO
+  }
+
+  // Calculate max offset for crop window positioning
+  const maxOffsetX = imgDisplayWidth - cropWidth
+  const maxOffsetY = imgDisplayHeight - cropHeight
+
+  // Position crop window based on offset
+  const cropLeft = (CANVAS_WIDTH - imgDisplayWidth) / 2 + maxOffsetX * offsetX.value
+  const cropTop = (CANVAS_HEIGHT - imgDisplayHeight) / 2 + maxOffsetY * offsetY.value
+
+  return {
+    width: `${cropWidth}px`,
+    height: `${cropHeight}px`,
+    left: `${cropLeft}px`,
+    top: `${cropTop}px`
+  }
+})
+
+// Keep old imageStyle for backwards compatibility (used in drag calculations)
 const imageStyle = computed(() => {
   if (!imageNaturalWidth.value || !imageNaturalHeight.value) return {}
 
@@ -193,31 +263,38 @@ const onDrag = (e) => {
   const deltaX = clientX - dragStartX.value
   const deltaY = clientY - dragStartY.value
 
-  // Convert pixel delta to offset delta (inverted because we're moving the image)
-  const viewportWidth = 800
-  const viewportHeight = viewportWidth / TARGET_RATIO
-
   const imgRatio = imageNaturalWidth.value / imageNaturalHeight.value
-  let maxOffsetX, maxOffsetY
 
-  if (imgRatio > TARGET_RATIO) {
-    const imgDisplayHeight = viewportHeight
-    const imgDisplayWidth = viewportHeight * imgRatio
-    maxOffsetX = imgDisplayWidth - viewportWidth
-    maxOffsetY = 0
+  // Get displayed image dimensions (same calc as canvasImageStyle)
+  let imgDisplayWidth, imgDisplayHeight
+  if (imgRatio > CANVAS_WIDTH / CANVAS_HEIGHT) {
+    imgDisplayWidth = CANVAS_WIDTH
+    imgDisplayHeight = CANVAS_WIDTH / imgRatio
   } else {
-    const imgDisplayWidth = viewportWidth
-    const imgDisplayHeight = viewportWidth / imgRatio
-    maxOffsetX = 0
-    maxOffsetY = imgDisplayHeight - viewportHeight
+    imgDisplayHeight = CANVAS_HEIGHT
+    imgDisplayWidth = CANVAS_HEIGHT * imgRatio
   }
 
-  // Calculate new offset (inverted drag direction)
+  // Get crop window dimensions
+  let cropWidth, cropHeight
+  if (imgRatio > TARGET_RATIO) {
+    cropHeight = imgDisplayHeight
+    cropWidth = cropHeight * TARGET_RATIO
+  } else {
+    cropWidth = imgDisplayWidth
+    cropHeight = cropWidth / TARGET_RATIO
+  }
+
+  // Calculate max offset (how far crop window can move)
+  const maxOffsetX = imgDisplayWidth - cropWidth
+  const maxOffsetY = imgDisplayHeight - cropHeight
+
+  // Calculate new offset (drag moves the crop window, so positive delta = positive offset)
   if (maxOffsetX > 0) {
-    offsetX.value = Math.max(0, Math.min(1, dragStartOffsetX.value - deltaX / maxOffsetX))
+    offsetX.value = Math.max(0, Math.min(1, dragStartOffsetX.value + deltaX / maxOffsetX))
   }
   if (maxOffsetY > 0) {
-    offsetY.value = Math.max(0, Math.min(1, dragStartOffsetY.value - deltaY / maxOffsetY))
+    offsetY.value = Math.max(0, Math.min(1, dragStartOffsetY.value + deltaY / maxOffsetY))
   }
 }
 
@@ -455,65 +532,69 @@ onUnmounted(() => {
   margin-bottom: 1rem;
 }
 
-.reframe-viewport {
+.reframe-canvas {
   position: relative;
   width: 800px;
+  height: 500px;
   max-width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
   cursor: grab;
   border-radius: 4px;
-  background: #000;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.reframe-viewport:active {
+.reframe-canvas:active {
   cursor: grabbing;
 }
 
 .reframe-image {
-  position: absolute;
-  top: 0;
-  left: 0;
   user-select: none;
   pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
-.frame-overlay {
+.crop-overlay {
   position: absolute;
   inset: 0;
+  z-index: 2;
   pointer-events: none;
 }
 
-.frame-outside {
+.crop-window {
   position: absolute;
-  background: rgba(0, 0, 0, 0.5);
+  /* Transparent window showing the crop area */
+  background: transparent;
+  border: 2px solid #4a90d9;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
-.frame-outside.top {
-  top: -100%;
-  left: 0;
-  right: 0;
-  height: 100%;
+/* Corner indicators */
+.crop-window::before,
+.crop-window::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: #fff;
+  border-style: solid;
 }
 
-.frame-outside.bottom {
-  bottom: -100%;
-  left: 0;
-  right: 0;
-  height: 100%;
+.crop-window::before {
+  top: -2px;
+  left: -2px;
+  border-width: 3px 0 0 3px;
 }
 
-.frame-outside.left {
-  left: -100%;
-  top: -100%;
-  bottom: -100%;
-  width: 100%;
-}
-
-.frame-outside.right {
-  right: -100%;
-  top: -100%;
-  bottom: -100%;
-  width: 100%;
+.crop-window::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 3px 3px 0;
 }
 </style>
