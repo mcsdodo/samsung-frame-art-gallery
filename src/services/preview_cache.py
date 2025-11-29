@@ -16,9 +16,17 @@ class PreviewCache:
     def __init__(self):
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    def _cache_key(self, identifier: str, crop_percent: int, matte_percent: int) -> str:
+    def _cache_key(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> str:
         """Generate cache key from identifier and processing parameters."""
-        key_string = f"{identifier}|crop={crop_percent}|matte={matte_percent}"
+        key_string = f"{identifier}|crop={crop_percent}|matte={matte_percent}|reframe={reframe_enabled}|ox={reframe_offset_x:.2f}|oy={reframe_offset_y:.2f}"
         return hashlib.md5(key_string.encode()).hexdigest()
 
     def _original_path(self, cache_key: str) -> Path:
@@ -27,7 +35,15 @@ class PreviewCache:
     def _processed_path(self, cache_key: str) -> Path:
         return CACHE_DIR / f"{cache_key}_proc.jpg"
 
-    def get(self, identifier: str, crop_percent: int, matte_percent: int) -> Optional[tuple[bytes, bytes]]:
+    def get(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> Optional[tuple[bytes, bytes]]:
         """
         Get cached preview if available.
 
@@ -35,11 +51,17 @@ class PreviewCache:
             identifier: Unique identifier (file path or object ID)
             crop_percent: Crop percentage used
             matte_percent: Matte percentage used
+            reframe_enabled: Whether reframe mode is enabled
+            reframe_offset_x: Reframe horizontal offset (0.0-1.0)
+            reframe_offset_y: Reframe vertical offset (0.0-1.0)
 
         Returns:
             Tuple of (original_bytes, processed_bytes) or None if not cached
         """
-        cache_key = self._cache_key(identifier, crop_percent, matte_percent)
+        cache_key = self._cache_key(
+            identifier, crop_percent, matte_percent,
+            reframe_enabled, reframe_offset_x, reframe_offset_y
+        )
         orig_path = self._original_path(cache_key)
         proc_path = self._processed_path(cache_key)
 
@@ -49,8 +71,17 @@ class PreviewCache:
 
         return None
 
-    def set(self, identifier: str, crop_percent: int, matte_percent: int,
-            original: bytes, processed: bytes) -> None:
+    def set(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        original: bytes,
+        processed: bytes,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> None:
         """
         Store preview in cache.
 
@@ -60,8 +91,14 @@ class PreviewCache:
             matte_percent: Matte percentage used
             original: Original thumbnail bytes
             processed: Processed thumbnail bytes
+            reframe_enabled: Whether reframe mode is enabled
+            reframe_offset_x: Reframe horizontal offset (0.0-1.0)
+            reframe_offset_y: Reframe vertical offset (0.0-1.0)
         """
-        cache_key = self._cache_key(identifier, crop_percent, matte_percent)
+        cache_key = self._cache_key(
+            identifier, crop_percent, matte_percent,
+            reframe_enabled, reframe_offset_x, reframe_offset_y
+        )
         orig_path = self._original_path(cache_key)
         proc_path = self._processed_path(cache_key)
 
@@ -69,15 +106,26 @@ class PreviewCache:
         proc_path.write_bytes(processed)
         _LOGGER.debug(f"Cached preview: {identifier}")
 
-    def invalidate(self, identifier: str, crop_percent: int = None, matte_percent: int = None) -> None:
+    def invalidate(
+        self,
+        identifier: str,
+        crop_percent: int = None,
+        matte_percent: int = None,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> None:
         """
         Invalidate cached previews.
 
-        If crop_percent and matte_percent are provided, only that specific preview is removed.
+        If all parameters are provided, only that specific preview is removed.
         Otherwise, all previews for the identifier are removed (by pattern matching).
         """
         if crop_percent is not None and matte_percent is not None:
-            cache_key = self._cache_key(identifier, crop_percent, matte_percent)
+            cache_key = self._cache_key(
+                identifier, crop_percent, matte_percent,
+                reframe_enabled, reframe_offset_x, reframe_offset_y
+            )
             for path in [self._original_path(cache_key), self._processed_path(cache_key)]:
                 if path.exists():
                     path.unlink()
