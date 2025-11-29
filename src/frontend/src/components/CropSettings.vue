@@ -1,7 +1,10 @@
 <template>
   <div class="crop-settings">
     <div v-if="allowReframe" class="reframe-field">
-      <label class="checkbox-label">
+      <label
+        class="checkbox-label"
+        title="Fill 16:9 frame by cropping the image. Drag to position the crop area."
+      >
         <input
           type="checkbox"
           v-model="reframeValue"
@@ -11,7 +14,7 @@
       </label>
     </div>
     <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
-      <label>Crop:</label>
+      <label title="Remove edges from all sides before adding matte">Crop:</label>
       <input
         type="number"
         v-model.number="cropValue"
@@ -20,11 +23,12 @@
         step="1"
         :disabled="reframeValue && allowReframe"
         @input="emitChange"
+        title="Percentage of image to crop from each edge"
       />
       <span class="unit">%</span>
     </div>
     <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
-      <label>Matte:</label>
+      <label title="Add white border around the image">Matte:</label>
       <input
         type="number"
         v-model.number="matteValue"
@@ -33,6 +37,7 @@
         step="1"
         :disabled="reframeValue && allowReframe"
         @input="emitChange"
+        title="Percentage of white border to add around the image"
       />
       <span class="unit">%</span>
     </div>
@@ -40,6 +45,7 @@
       class="preview-btn"
       @click="$emit('preview')"
       :disabled="!hasSelection"
+      title="Preview how the image will look after processing"
     >
       Preview
     </button>
