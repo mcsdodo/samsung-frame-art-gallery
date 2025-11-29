@@ -14,19 +14,3 @@ services:
       - DEFAULT_CROP_PERCENT=${DEFAULT_CROP_PERCENT:-5}
       - DEFAULT_MATTE_PERCENT=${DEFAULT_MATTE_PERCENT:-10}
     restart: unless-stopped
-    labels:
-      caddy_1: art.lacny.me
-      caddy_1.import: wildcard
-      caddy_1.reverse_proxy: "{{upstreams 8080}}"
-
-  # caddy-agent:
-  #   image: mcsdodo/caddy-agent
-  #   container_name: caddy-agent-remote
-  #   restart: unless-stopped
-  #   volumes:
-  #     - //var/run/docker.sock:/var/run/docker.sock:ro
-  #   environment:
-  #     - CADDY_URL=http://192.168.0.21:2020
-  #     - AGENT_ID=host3-remote
-  #     - HOST_IP=192.168.0.99
-  #     - DOCKER_LABEL_PREFIX=caddy
