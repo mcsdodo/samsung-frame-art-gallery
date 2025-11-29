@@ -96,6 +96,14 @@ class MetClient:
                 seen_images.add(primary)
 
                 is_low_res = not obj.get("primaryImage")
+                width = obj.get("primaryImageWidth") or 0
+                height = obj.get("primaryImageHeight") or 0
+
+                # Fetch dimensions from image header if not provided by API
+                if width == 0 or height == 0:
+                    small_url = obj.get("primaryImageSmall", primary)
+                    width, height = self.fetch_image_dimensions(small_url)
+
                 results.append({
                     "object_id": obj.get("objectID"),
                     "title": obj.get("title", "Untitled"),
@@ -105,8 +113,8 @@ class MetClient:
                     "department": obj.get("department", ""),
                     "image_url": primary,
                     "image_url_small": obj.get("primaryImageSmall", primary),
-                    "width": obj.get("primaryImageWidth") or 0,
-                    "height": obj.get("primaryImageHeight") or 0,
+                    "width": width,
+                    "height": height,
                     "is_low_res": is_low_res,
                     "met_url": obj.get("objectURL", "")
                 })
@@ -257,6 +265,34 @@ class MetClient:
         )
         with urllib.request.urlopen(req, timeout=30) as response:
             return response.read()
+
+    def fetch_image_dimensions(self, image_url: str) -> tuple[int, int]:
+        """Fetch image dimensions by reading just the header bytes.
+
+        Returns: (width, height) tuple, or (0, 0) on failure.
+        """
+        try:
+            from PIL import Image
+            from io import BytesIO
+
+            _LOGGER.debug(f"Fetching dimensions for: {image_url}")
+            req = urllib.request.Request(
+                image_url,
+                headers={
+                    "User-Agent": MET_USER_AGENT,
+                    "Accept": "image/*",
+                    "Range": "bytes=0-65535",  # First 64KB usually contains header
+                }
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                header_bytes = response.read()
+
+            # PIL can read dimensions from partial data
+            with Image.open(BytesIO(header_bytes)) as img:
+                return img.size
+        except Exception as e:
+            _LOGGER.warning(f"Failed to fetch dimensions for {image_url}: {e}")
+            return (0, 0)
 
 
 # Singleton instance
