@@ -15,6 +15,40 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg"}
 MAX_WORKERS = 4
 
 
+def get_dimensions_cache_path(image_path: str) -> Path:
+    """Generate cache path for image dimensions JSON."""
+    hash_key = hashlib.md5(f"{image_path}|dims".encode()).hexdigest()
+    return CACHE_DIR / f"{hash_key}.dims"
+
+
+def get_image_dimensions(image_path: Path) -> tuple[int, int]:
+    """Get image dimensions, using cache if available.
+
+    Returns: (width, height) tuple
+    """
+    cache_path = get_dimensions_cache_path(str(image_path))
+
+    # Check cache first
+    if cache_path.exists():
+        try:
+            data = cache_path.read_text()
+            w, h = data.split(',')
+            return (int(w), int(h))
+        except Exception:
+            pass  # Cache corrupted, regenerate
+
+    # Read dimensions from image
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(image_path) as img:
+        width, height = img.size
+
+    # Cache the result
+    cache_path.write_text(f"{width},{height}")
+
+    return (width, height)
+
+
 def get_cache_path(image_path: str, size: int = 200) -> Path:
     """Generate cache path using MD5 hash of image path and size."""
     hash_key = hashlib.md5(f"{image_path}|size={size}".encode()).hexdigest()
