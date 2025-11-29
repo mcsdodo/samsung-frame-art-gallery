@@ -108,29 +108,47 @@ def get_all_images() -> list[Path]:
     return images
 
 
-def get_valid_cache_keys() -> set[str]:
+def get_valid_cache_keys(size: int = 200) -> set[str]:
     """Get set of valid cache keys for current images."""
     images = get_all_images()
-    return {hashlib.md5(str(p).encode()).hexdigest() for p in images}
+    # Must match the format used in get_cache_path()
+    return {hashlib.md5(f"{p}|size={size}".encode()).hexdigest() for p in images}
+
+
+def get_valid_dims_keys() -> set[str]:
+    """Get set of valid dimension cache keys for current images."""
+    images = get_all_images()
+    # Must match the format used in get_dimensions_cache_path()
+    return {hashlib.md5(f"{p}|dims".encode()).hexdigest() for p in images}
 
 
 def cleanup_orphaned_thumbnails() -> int:
-    """Remove thumbnails that no longer have corresponding source images."""
+    """Remove thumbnails and dimension caches that no longer have corresponding source images."""
     if not CACHE_DIR.exists():
         return 0
 
-    valid_keys = get_valid_cache_keys()
+    valid_thumb_keys = get_valid_cache_keys()
+    valid_dims_keys = get_valid_dims_keys()
     removed = 0
 
+    # Clean up orphaned thumbnails
     for thumb_path in CACHE_DIR.glob("*.jpg"):
         key = thumb_path.stem
-        if key not in valid_keys:
+        if key not in valid_thumb_keys:
             thumb_path.unlink()
             removed += 1
             logger.debug(f"Removed orphaned thumbnail: {thumb_path.name}")
 
+    # Clean up orphaned dimension caches
+    for dims_path in CACHE_DIR.glob("*.dims"):
+        key = dims_path.stem
+        if key not in valid_dims_keys:
+            dims_path.unlink()
+            removed += 1
+            logger.debug(f"Removed orphaned dimensions: {dims_path.name}")
+
     if removed:
-        logger.info(f"Cleaned up {removed} orphaned thumbnails")
+        logger.info(f"Cleaned up {removed} orphaned cache file(s)")
     return removed
 
 
