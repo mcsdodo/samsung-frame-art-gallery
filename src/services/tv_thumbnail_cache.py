@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Set
 
 _LOGGER = logging.getLogger(__name__)
 
-CACHE_DIR = Path("/tmp/tv_thumbnails")
+# Use persistent storage alongside local image thumbnails
+THUMBNAILS_DIR = Path(os.environ.get("THUMBNAILS_DIR", "/thumbnails"))
+CACHE_DIR = THUMBNAILS_DIR / "tv"
 
 
 class TVThumbnailCache:
