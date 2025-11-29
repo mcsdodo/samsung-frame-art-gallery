@@ -171,7 +171,165 @@ git commit -m "feat: add reframe image processing for 16:9 fill"
 
 ---
 
-## Task 2: Backend - Update API Models and Endpoints
+## Task 2: Backend - Update Preview Cache for Reframe Parameters
+
+**Files:**
+- Modify: `src/services/preview_cache.py`
+
+**Why:** The preview cache must include reframe parameters in its cache key, otherwise toggling "Re-framing" could return cached non-reframed previews (or vice versa).
+
+**Step 1: Update `_cache_key` method**
+
+Replace the `_cache_key` method (lines 19-22) with:
+
+```python
+    def _cache_key(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> str:
+        """Generate cache key from identifier and processing parameters."""
+        key_string = f"{identifier}|crop={crop_percent}|matte={matte_percent}|reframe={reframe_enabled}|ox={reframe_offset_x:.2f}|oy={reframe_offset_y:.2f}"
+        return hashlib.md5(key_string.encode()).hexdigest()
+```
+
+**Step 2: Update `get` method signature**
+
+Replace the `get` method (lines 30-50) with:
+
+```python
+    def get(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> Optional[tuple[bytes, bytes]]:
+        """
+        Get cached preview if available.
+
+        Args:
+            identifier: Unique identifier (file path or object ID)
+            crop_percent: Crop percentage used
+            matte_percent: Matte percentage used
+            reframe_enabled: Whether reframe mode is enabled
+            reframe_offset_x: Reframe horizontal offset (0.0-1.0)
+            reframe_offset_y: Reframe vertical offset (0.0-1.0)
+
+        Returns:
+            Tuple of (original_bytes, processed_bytes) or None if not cached
+        """
+        cache_key = self._cache_key(
+            identifier, crop_percent, matte_percent,
+            reframe_enabled, reframe_offset_x, reframe_offset_y
+        )
+        orig_path = self._original_path(cache_key)
+        proc_path = self._processed_path(cache_key)
+
+        if orig_path.exists() and proc_path.exists():
+            _LOGGER.debug(f"Preview cache hit: {identifier}")
+            return orig_path.read_bytes(), proc_path.read_bytes()
+
+        return None
+```
+
+**Step 3: Update `set` method signature**
+
+Replace the `set` method (lines 52-70) with:
+
+```python
+    def set(
+        self,
+        identifier: str,
+        crop_percent: int,
+        matte_percent: int,
+        original: bytes,
+        processed: bytes,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> None:
+        """
+        Store preview in cache.
+
+        Args:
+            identifier: Unique identifier (file path or object ID)
+            crop_percent: Crop percentage used
+            matte_percent: Matte percentage used
+            original: Original thumbnail bytes
+            processed: Processed thumbnail bytes
+            reframe_enabled: Whether reframe mode is enabled
+            reframe_offset_x: Reframe horizontal offset (0.0-1.0)
+            reframe_offset_y: Reframe vertical offset (0.0-1.0)
+        """
+        cache_key = self._cache_key(
+            identifier, crop_percent, matte_percent,
+            reframe_enabled, reframe_offset_x, reframe_offset_y
+        )
+        orig_path = self._original_path(cache_key)
+        proc_path = self._processed_path(cache_key)
+
+        orig_path.write_bytes(original)
+        proc_path.write_bytes(processed)
+        _LOGGER.debug(f"Cached preview: {identifier}")
+```
+
+**Step 4: Update `invalidate` method signature**
+
+Replace the `invalidate` method (lines 72-87) with:
+
+```python
+    def invalidate(
+        self,
+        identifier: str,
+        crop_percent: int = None,
+        matte_percent: int = None,
+        reframe_enabled: bool = False,
+        reframe_offset_x: float = 0.5,
+        reframe_offset_y: float = 0.5
+    ) -> None:
+        """
+        Invalidate cached previews.
+
+        If all parameters are provided, only that specific preview is removed.
+        Otherwise, all previews for the identifier are removed (by pattern matching).
+        """
+        if crop_percent is not None and matte_percent is not None:
+            cache_key = self._cache_key(
+                identifier, crop_percent, matte_percent,
+                reframe_enabled, reframe_offset_x, reframe_offset_y
+            )
+            for path in [self._original_path(cache_key), self._processed_path(cache_key)]:
+                if path.exists():
+                    path.unlink()
+            _LOGGER.debug(f"Invalidated preview: {identifier}")
+        else:
+            # Can't efficiently invalidate all without tracking - just log
+            _LOGGER.debug(f"Invalidate all previews for {identifier} not implemented")
+```
+
+**Step 5: Verify changes compile**
+
+Run: `cd C:\_dev\samsung-frame-art-gallery && python -c "from src.services.preview_cache import get_preview_cache; print('OK')"`
+
+Expected: `OK`
+
+**Step 6: Commit**
+
+```bash
+git add src/services/preview_cache.py
+git commit -m "feat: add reframe parameters to preview cache key"
+```
+
+---
+
+## Task 3: Backend - Update API Models and Endpoints
 
 **Files:**
 - Modify: `src/api/tv.py`
@@ -203,7 +361,7 @@ class UploadRequest(BaseModel):
     reframe_offsets: dict[str, dict] = {}  # path -> {"x": 0.5, "y": 0.5}
 ```
 
-**Step 3: Update preview endpoint to use reframe params**
+**Step 3: Update preview endpoint to use reframe params with updated cache calls**
 
 Replace the `process_single_preview` inner function in the `/preview` endpoint (lines 199-224) with:
 
@@ -219,18 +377,19 @@ Replace the `process_single_preview` inner function in the `/preview` endpoint (
             offset_x = offset.get("x", 0.5)
             offset_y = offset.get("y", 0.5)
 
-            # Check cache first (only for non-reframe or center-positioned reframe)
-            cache_key_valid = not request.reframe_enabled or (offset_x == 0.5 and offset_y == 0.5)
-            if cache_key_valid:
-                cached = cache.get(path, request.crop_percent, request.matte_percent)
-                if cached:
-                    original, processed = cached
-                    return {
-                        "id": path,
-                        "name": image_path.name,
-                        "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
-                        "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
-                    }
+            # Check cache first
+            cached = cache.get(
+                path, request.crop_percent, request.matte_percent,
+                request.reframe_enabled, offset_x, offset_y
+            )
+            if cached:
+                original, processed = cached
+                return {
+                    "id": path,
+                    "name": image_path.name,
+                    "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
+                    "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
+                }
 
             image_data = image_path.read_bytes()
             original, processed = await asyncio.to_thread(
@@ -243,9 +402,12 @@ Replace the `process_single_preview` inner function in the `/preview` endpoint (
                 offset_y
             )
 
-            # Cache only stable results
-            if cache_key_valid:
-                cache.set(path, request.crop_percent, request.matte_percent, original, processed)
+            # Store in cache
+            cache.set(
+                path, request.crop_percent, request.matte_percent,
+                original, processed,
+                request.reframe_enabled, offset_x, offset_y
+            )
 
             return {
                 "id": path,
@@ -305,19 +467,130 @@ git commit -m "feat: add reframe parameters to preview and upload endpoints"
 
 ---
 
-## Task 3: Frontend - Add Reframe Checkbox to CropSettings
+## Task 4: Backend - Add Variable Size Thumbnail Support
+
+**Files:**
+- Modify: `src/services/thumbnails.py`
+- Modify: `src/api/images.py`
+
+**Why:** The reframe preview needs larger thumbnails (1200px) for the drag UI, but the current `thumbnails.py` has hardcoded `THUMBNAIL_SIZE = (200, 200)`. We must also include size in the cache key to avoid serving wrong-sized thumbnails.
+
+**Step 1: Update `get_cache_path` to include size**
+
+Replace the `get_cache_path` function (lines 18-21) with:
+
+```python
+def get_cache_path(image_path: str, size: int = 200) -> Path:
+    """Generate cache path using MD5 hash of image path and size."""
+    hash_key = hashlib.md5(f"{image_path}|size={size}".encode()).hexdigest()
+    return CACHE_DIR / f"{hash_key}.jpg"
+```
+
+**Step 2: Update `generate_thumbnail` to accept size parameter**
+
+Replace the `generate_thumbnail` function (lines 24-44) with:
+
+```python
+def generate_thumbnail(image_path: Path, size: int = 200) -> bytes:
+    """Generate thumbnail for a single image, using cache if available.
+
+    Args:
+        image_path: Path to the source image
+        size: Maximum dimension (width or height) for the thumbnail
+    """
+    cache_path = get_cache_path(str(image_path), size)
+
+    if cache_path.exists():
+        return cache_path.read_bytes()
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(image_path) as img:
+        img.thumbnail((size, size), Image.Resampling.LANCZOS)
+
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        thumbnail_data = buffer.getvalue()
+
+    cache_path.write_bytes(thumbnail_data)
+    return thumbnail_data
+```
+
+**Step 3: Update `_generate_single_thumbnail` for compatibility**
+
+Replace the `_generate_single_thumbnail` function (lines 47-53) with:
+
+```python
+def _generate_single_thumbnail(image_path: Path, size: int = 200) -> tuple[Path, bool, str]:
+    """Generate thumbnail for a single image. Returns (path, success, error)."""
+    try:
+        generate_thumbnail(image_path, size)
+        return (image_path, True, "")
+    except Exception as e:
+        return (image_path, False, str(e))
+```
+
+**Step 4: Update `get_valid_cache_keys` for default size**
+
+Note: The existing `get_valid_cache_keys` function is only used for cleanup of default-sized thumbnails, so we keep it using the default size. No changes needed.
+
+**Step 5: Update the API endpoint in `images.py`**
+
+Replace the thumbnail endpoint (lines 77-88) with:
+
+```python
+@router.get("/{path:path}/thumbnail")
+async def get_thumbnail(path: str, size: int = 200):
+    """Get thumbnail for an image. Size parameter controls max dimension (default 200, max 1200)."""
+    # Clamp size between 50 and 1200
+    size = min(max(size, 50), 1200)
+
+    image_path = get_safe_path(path)
+
+    if not is_valid_image(image_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    try:
+        thumbnail_data = generate_thumbnail(image_path, size)
+        return Response(content=thumbnail_data, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+```
+
+**Step 6: Verify changes compile**
+
+Run: `cd C:\_dev\samsung-frame-art-gallery && python -c "from src.services.thumbnails import generate_thumbnail; from src.api.images import router; print('OK')"`
+
+Expected: `OK`
+
+**Step 7: Commit**
+
+```bash
+git add src/services/thumbnails.py src/api/images.py
+git commit -m "feat: add variable size thumbnail support for reframe preview"
+```
+
+---
+
+## Task 5: Frontend - Add Reframe Checkbox to CropSettings (with allowReframe prop)
 
 **Files:**
 - Modify: `src/frontend/src/components/CropSettings.vue`
+- Modify: `src/frontend/src/views/MetPanel.vue`
 
-**Step 1: Update template with reframe checkbox**
+**Why:** MetPanel.vue also uses CropSettings.vue. Adding the reframe checkbox there would break the Met tab experience since the Met API doesn't support reframing. We add an `allowReframe` prop (default true) to conditionally show the checkbox.
+
+**Step 1: Update template with reframe checkbox (conditional)**
 
 Replace the entire `<template>` section (lines 1-35) with:
 
 ```vue
 <template>
   <div class="crop-settings">
-    <div class="reframe-field">
+    <div v-if="allowReframe" class="reframe-field">
       <label class="checkbox-label">
         <input
           type="checkbox"
@@ -327,7 +600,7 @@ Replace the entire `<template>` section (lines 1-35) with:
         Re-framing
       </label>
     </div>
-    <div class="crop-field" :class="{ disabled: reframeValue }">
+    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
       <label>Crop:</label>
       <input
         type="number"
@@ -335,12 +608,12 @@ Replace the entire `<template>` section (lines 1-35) with:
         min="0"
         max="50"
         step="1"
-        :disabled="reframeValue"
+        :disabled="reframeValue && allowReframe"
         @input="emitChange"
       />
       <span class="unit">%</span>
     </div>
-    <div class="crop-field" :class="{ disabled: reframeValue }">
+    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
       <label>Matte:</label>
       <input
         type="number"
@@ -348,7 +621,7 @@ Replace the entire `<template>` section (lines 1-35) with:
         min="0"
         max="50"
         step="1"
-        :disabled="reframeValue"
+        :disabled="reframeValue && allowReframe"
         @input="emitChange"
       />
       <span class="unit">%</span>
@@ -364,7 +637,7 @@ Replace the entire `<template>` section (lines 1-35) with:
 </template>
 ```
 
-**Step 2: Update script to include reframeValue**
+**Step 2: Update script to include reframeValue and allowReframe prop**
 
 Replace the entire `<script setup>` section (lines 37-71) with:
 
@@ -377,6 +650,10 @@ const props = defineProps({
   hasSelection: {
     type: Boolean,
     default: false
+  },
+  allowReframe: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -388,7 +665,7 @@ const emitChange = () => {
   emit('change', {
     crop: cropValue.value,
     matte: matteValue.value,
-    reframe: reframeValue.value
+    reframe: props.allowReframe ? reframeValue.value : false
   })
 }
 
@@ -506,22 +783,35 @@ Replace the entire `<style scoped>` section (lines 73-129) with:
 </style>
 ```
 
-**Step 4: Verify frontend compiles**
+**Step 4: Update MetPanel.vue to disable reframe**
+
+In `src/frontend/src/views/MetPanel.vue`, replace the CropSettings component (lines 68-72) with:
+
+```vue
+        <CropSettings
+          :has-selection="selectedIds.size > 0"
+          :allow-reframe="false"
+          @change="setSettings"
+          @preview="loadPreviews"
+        />
+```
+
+**Step 5: Verify frontend compiles**
 
 Run: `cd C:\_dev\samsung-frame-art-gallery\src\frontend && npm run build 2>&1 | head -20`
 
 Expected: Build succeeds (may have warnings, no errors)
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add src/frontend/src/components/CropSettings.vue
-git commit -m "feat: add re-framing checkbox to CropSettings"
+git add src/frontend/src/components/CropSettings.vue src/frontend/src/views/MetPanel.vue
+git commit -m "feat: add re-framing checkbox to CropSettings with allowReframe prop"
 ```
 
 ---
 
-## Task 4: Frontend - Wire Reframe State in LocalPanel
+## Task 6: Frontend - Wire Reframe State in LocalPanel
 
 **Files:**
 - Modify: `src/frontend/src/views/LocalPanel.vue`
@@ -695,7 +985,7 @@ git commit -m "feat: wire reframe state and API calls in LocalPanel"
 
 ---
 
-## Task 5: Frontend - Add Draggable Reframe UI to PreviewModal
+## Task 7: Frontend - Add Draggable Reframe UI to PreviewModal
 
 **Files:**
 - Modify: `src/frontend/src/components/PreviewModal.vue`
@@ -1079,53 +1369,13 @@ git commit -m "feat: add draggable reframe UI to PreviewModal"
 
 ---
 
-## Task 6: Backend - Add Large Thumbnail Endpoint
-
-The reframe preview needs a larger thumbnail for the drag UI.
-
-**Files:**
-- Modify: `src/api/images.py`
-
-**Step 1: Find and update the thumbnail endpoint**
-
-First, read the images.py file to find where to add the size parameter:
-
-Run: Read `src/api/images.py` to see current thumbnail endpoint.
-
-Add `size` query parameter to the existing thumbnail endpoint. The endpoint should accept an optional `size` parameter (default 200, max 1200) and generate a thumbnail of that size.
-
-Update the thumbnail endpoint (look for `@router.get("/{path:path}/thumbnail")`):
-
-```python
-@router.get("/{path:path}/thumbnail")
-async def get_thumbnail(path: str, size: int = 200):
-    """Get thumbnail for an image. Size parameter controls max dimension (default 200, max 1200)."""
-    size = min(max(size, 50), 1200)  # Clamp between 50 and 1200
-    # ... rest of implementation uses 'size' instead of hardcoded 200
-```
-
-**Step 2: Verify server starts**
-
-Run: `cd C:\_dev\samsung-frame-art-gallery && python -c "from src.api.images import router; print('OK')"`
-
-Expected: `OK`
-
-**Step 3: Commit**
-
-```bash
-git add src/api/images.py
-git commit -m "feat: add size parameter to thumbnail endpoint for reframe preview"
-```
-
----
-
-## Task 7: Integration Test
+## Task 8: Integration Test
 
 **Step 1: Start the development environment**
 
 Run: `cd C:\_dev\samsung-frame-art-gallery && docker-compose up --build -d`
 
-**Step 2: Open browser and test**
+**Step 2: Test Local Images tab**
 
 1. Navigate to `http://localhost:8080`
 2. Select a single image
@@ -1143,7 +1393,13 @@ Run: `cd C:\_dev\samsung-frame-art-gallery && docker-compose up --build -d`
 4. Verify info message appears: "Re-framing uses center crop..."
 5. Verify no drag interface, standard preview shown
 
-**Step 4: Final commit**
+**Step 4: Test Met Museum tab**
+
+1. Switch to Met Museum tab
+2. Verify "Re-framing" checkbox does NOT appear
+3. Verify Crop and Matte controls still work normally
+
+**Step 5: Final commit**
 
 ```bash
 git add -A
@@ -1157,9 +1413,10 @@ git commit -m "feat: complete re-framing feature implementation"
 | Task | Files | Purpose |
 |------|-------|---------|
 | 1 | `image_processor.py` | Add `_reframe_image()` function |
-| 2 | `tv.py` | Add reframe params to API models |
-| 3 | `CropSettings.vue` | Add reframe checkbox UI |
-| 4 | `LocalPanel.vue` | Wire reframe state and API calls |
-| 5 | `PreviewModal.vue` | Add draggable reframe UI |
-| 6 | `images.py` | Add size param for large thumbnails |
-| 7 | - | Integration testing |
+| 2 | `preview_cache.py` | Add reframe params to cache key |
+| 3 | `tv.py` | Add reframe params to API models |
+| 4 | `thumbnails.py`, `images.py` | Variable size thumbnail support |
+| 5 | `CropSettings.vue`, `MetPanel.vue` | Reframe checkbox with allowReframe prop |
+| 6 | `LocalPanel.vue` | Wire reframe state and API calls |
+| 7 | `PreviewModal.vue` | Add draggable reframe UI |
+| 8 | - | Integration testing |
