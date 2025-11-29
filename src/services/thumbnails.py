@@ -40,8 +40,12 @@ def get_image_dimensions(image_path: Path) -> tuple[int, int]:
     # Read dimensions from image
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    with Image.open(image_path) as img:
-        width, height = img.size
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+    except Exception as e:
+        logger.warning(f"Failed to read dimensions for {image_path}: {e}")
+        return (0, 0)  # Frontend will fall back to 16:9
 
     # Cache the result
     cache_path.write_text(f"{width},{height}")
