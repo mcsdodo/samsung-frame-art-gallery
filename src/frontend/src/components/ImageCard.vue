@@ -3,6 +3,7 @@
     ref="cardRef"
     class="image-card"
     :class="{ selected, current: isCurrent }"
+    :style="{ aspectRatio: computedAspectRatio }"
     @click="$emit('toggle')"
     @dblclick.stop="$emit('preview')"
     @touchstart="onTouchStart"
@@ -135,13 +136,30 @@ const displayName = computed(() => {
   }
   return props.image.content_id || 'Unknown'
 })
+
+const computedAspectRatio = computed(() => {
+  const w = props.image.width
+  const h = props.image.height
+
+  if (!w || !h) {
+    return 16 / 9  // Default fallback
+  }
+
+  let ratio = w / h
+
+  // Cap extreme ratios to prevent layout issues
+  // Min 1:2 (portrait), Max 3:1 (landscape)
+  ratio = Math.max(ratio, 0.5)   // No taller than 1:2
+  ratio = Math.min(ratio, 3)     // No wider than 3:1
+
+  return ratio
+})
 </script>
 
 <style scoped>
 .image-card {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 landscape aspect ratio */
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
