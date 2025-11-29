@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Web application for managing artwork on Samsung Frame TVs. FastAPI backend + Vue 3 frontend, deployed via Docker.
+Web application for managing artwork on Samsung Frame TVs. Features local image browsing, Met Museum public domain artwork integration, and image processing (crop, matte, re-framing). FastAPI backend + Vue 3 frontend, deployed via Docker.
 
 ## File Naming Convention
 
@@ -15,36 +15,41 @@ Tasks, plans, and design documents are ALL stored in the `_tasks/` folder. Do NO
 ## Project Structure
 
 ```
-/                           # Root directory
+/
 ├── src/
-│   ├── main.py             # FastAPI app entry point, lifespan management
+│   ├── main.py                 # FastAPI app entry point, lifespan management
 │   ├── api/
-│   │   ├── images.py       # /api/images/* endpoints
-│   │   └── tv.py           # /api/tv/* endpoints
+│   │   ├── images.py           # /api/images/* endpoints
+│   │   ├── tv.py               # /api/tv/* endpoints
+│   │   └── met.py              # /api/met/* endpoints (Met Museum)
 │   ├── services/
-│   │   ├── tv_client.py    # Samsung TV WebSocket client (singleton)
-│   │   ├── tv_discovery.py # SSDP-based TV discovery
-│   │   ├── tv_settings.py  # Persistent TV selection (JSON in /app/data)
+│   │   ├── tv_client.py        # Samsung TV WebSocket client (singleton)
+│   │   ├── tv_discovery.py     # SSDP-based TV discovery
+│   │   ├── tv_settings.py      # Persistent TV selection (JSON in /app/data)
 │   │   ├── tv_thumbnail_cache.py
-│   │   └── thumbnails.py   # Local image thumbnail generation
-│   └── frontend/           # Vue 3 SPA
+│   │   ├── met_client.py       # Met Museum Collection API client
+│   │   ├── image_processor.py  # Crop, matte, reframe processing
+│   │   ├── preview_cache.py    # Preview generation caching
+│   │   └── thumbnails.py       # Local image thumbnail generation
+│   └── frontend/               # Vue 3 SPA
 │       ├── src/
-│       │   ├── App.vue     # Root component
-│       │   ├── components/ # Reusable UI components
-│       │   └── views/      # Page-level components
+│       │   ├── App.vue         # Root component
+│       │   ├── components/     # Reusable UI components
+│       │   └── views/          # Page-level components (LocalPanel, MetPanel, TVPanel)
 │       └── package.json
 ├── docker/
-│   └── Dockerfile          # Multi-stage build
+│   └── Dockerfile              # Multi-stage build
 ├── docker-compose.yml
 ├── requirements.txt
-└── _tasks/                 # Design docs, plans, tasks
+└── _tasks/                     # Design docs, plans, implementation notes
 ```
 
 ## Tech Stack
 
-- **Backend:** FastAPI 0.109+, Python 3.11, Pillow, uvicorn
+- **Backend:** FastAPI 0.109+, Python 3.11, Pillow, httpx, uvicorn
 - **Frontend:** Vue 3.4, Vite 5
 - **TV API:** samsung-tv-ws-api (WebSocket-based)
+- **External API:** Met Museum Collection API
 - **Container:** Docker with multi-stage build
 
 ## Key APIs
@@ -53,12 +58,15 @@ Tasks, plans, and design documents are ALL stored in the `_tasks/` folder. Do NO
 |----------|---------|
 | `GET /api/images` | List local images |
 | `GET /api/images/folders` | List folders |
-| `GET /api/images/{path}/thumbnail` | Get thumbnail |
+| `GET /api/images/{path}/thumbnail` | Get thumbnail (supports `?size=` param) |
 | `GET /api/tv/discover` | SSDP scan for TVs |
 | `GET /api/tv/status` | TV connection status |
 | `GET /api/tv/artwork` | List TV artwork |
-| `POST /api/tv/upload` | Upload to TV |
-| `POST /api/tv/artwork/current` | Display artwork |
+| `POST /api/tv/upload` | Upload to TV (with crop/matte/reframe) |
+| `POST /api/tv/preview` | Generate preview images |
+| `GET /api/met/highlights` | Get Met Museum highlights |
+| `GET /api/met/search` | Search Met collection |
+| `POST /api/met/upload` | Download from Met and upload to TV |
 
 ## Development Commands
 
@@ -87,19 +95,23 @@ npm run build
 | `TV_IP` | - | Pre-configured TV IP address |
 | `IMAGES_DIR` | `/images` | Path to mounted images |
 | `THUMBNAILS_DIR` | `/thumbnails` | Thumbnail cache directory |
+| `DEFAULT_CROP_PERCENT` | `5` | Default edge crop percentage |
+| `DEFAULT_MATTE_PERCENT` | `10` | Default matte size percentage |
 
 ## Important Implementation Details
 
 1. **TVClient is a singleton** - Access via `get_tv_client()` in `tv_client.py`
-2. **TV API calls use thread pool** - Wrapped in `asyncio.to_thread()` to avoid blocking
-3. **Thumbnail caching** - MD5 hash-based filenames, parallel generation (4 workers)
-4. **API version detection** - Auto-detects v3.x vs v4.x+ for thumbnail fetching
-5. **Settings persistence** - JSON file in `/app/data/tv_settings.json`
+2. **MetClient is a singleton** - Access via `get_met_client()` in `met_client.py`
+3. **TV API calls use thread pool** - Wrapped in `asyncio.to_thread()` to avoid blocking
+4. **Thumbnail caching** - MD5 hash-based filenames, supports variable sizes
+5. **Preview caching** - Cache key includes crop/matte/reframe params
+6. **API version detection** - Auto-detects TV v3.x vs v4.x+ for thumbnail fetching
+7. **Settings persistence** - JSON file in `/app/data/tv_settings.json`
 
 ## Common Tasks
 
 ### Adding a new API endpoint
-1. Add route in `src/api/images.py` or `src/api/tv.py`
+1. Add route in appropriate file under `src/api/`
 2. Router is already mounted in `main.py`
 
 ### Adding a new Vue component
@@ -109,24 +121,21 @@ npm run build
 ### Modifying TV communication
 1. All TV logic in `src/services/tv_client.py`
 2. Uses `samsung-tv-ws-api` library
-3. Test with `src/verify_tv.py` utility
+
+### Modifying image processing
+1. Core logic in `src/services/image_processor.py`
+2. Functions: `process_for_tv()`, `generate_preview()`, `_crop_image()`, `_add_matte()`, `_reframe_image()`
 
 ## Docker Volumes
 
 - `/images` - Mount your image collection (read-only)
-- `/thumbnails` - Thumbnail cache (named volume)
-- `/app/data` - TV settings persistence (bind mount `./data`)
+- `/thumbnails` - Thumbnail cache
+- `/app/data` - TV settings persistence
 
 ## Notes
 
 - Network-local only, no authentication (trusted network assumption)
 - TV must be powered on (not deep standby) for discovery
 - Supports JPEG, PNG image formats
+- Met Museum images are public domain (CC0)
 - Tested with Samsung Frame TVs (Art Mode required)
-
-
-# Development environments
-1. for development use docker-compose file
-2. for deployment on a server use passwordless ssh ``ssh root@192.168.0.99`` and run the docker commands there
-3. caddy proxy sits here ``ssh root@192.168.0.112``. DO NOT MAKE ANY CHANGES WITHOUT CONSULTING ME FIRST. You can check the logs if needed.
-4. DO NOT make any changes on the caddy instance 192.168.0.22 without asking first.
