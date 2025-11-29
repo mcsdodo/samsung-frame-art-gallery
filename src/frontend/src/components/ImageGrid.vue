@@ -27,17 +27,25 @@
       No images found
     </div>
 
-    <div v-else ref="gridRef" class="grid" @scroll="onScroll">
-      <ImageCard
-        v-for="image in visibleImages"
-        :key="image.path || image.object_id || image.content_id"
-        :image="image"
-        :selected="selectedIds.has(image.path || image.object_id || image.content_id)"
-        :is-current="currentId === (image.content_id)"
-        :is-local="isLocal"
-        @toggle="$emit('toggle', image)"
-        @preview="$emit('preview', image)"
-      />
+    <div v-else ref="gridRef" class="grid-container" @scroll="onScroll">
+      <MasonryWall
+        :items="visibleImages"
+        :column-width="180"
+        :gap="16"
+        :ssr-columns="4"
+        :scroll-container="gridRef"
+      >
+        <template #default="{ item }">
+          <ImageCard
+            :image="item"
+            :selected="selectedIds.has(item.path || item.object_id || item.content_id)"
+            :is-current="currentId === (item.content_id)"
+            :is-local="isLocal"
+            @toggle="$emit('toggle', item)"
+            @preview="$emit('preview', item)"
+          />
+        </template>
+      </MasonryWall>
       <div v-if="hasMore" ref="sentinelRef" class="load-more-sentinel">
         <div v-if="loadingMore" class="loading-spinner">
           <div class="spinner"></div>
@@ -50,6 +58,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted, provide } from 'vue'
+import MasonryWall from '@yeger/vue-masonry-wall'
 import ImageCard from './ImageCard.vue'
 
 const BATCH_SIZE = 24
@@ -195,14 +204,11 @@ onUnmounted(() => {
   color: white;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+.grid-container {
   padding: 1rem;
   overflow-y: auto;
   flex: 1;
-  min-height: 0; /* Allow flex child to shrink and enable scrolling */
+  min-height: 0;
 }
 
 .load-more-sentinel {
