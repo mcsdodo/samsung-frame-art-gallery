@@ -53,8 +53,11 @@
       :crop-percent="cropPercent"
       :matte-percent="mattePercent"
       :loading="previewLoading"
+      :reframe-enabled="reframeEnabled"
+      :selected-paths="Array.from(selectedIds)"
       @close="showPreview = false"
       @upload="uploadFromPreview"
+      @offset-change="fetchPreviewWithOffset"
     />
   </div>
 </template>
@@ -79,6 +82,8 @@ const mattePercent = ref(10)
 const showPreview = ref(false)
 const previewLoading = ref(false)
 const previews = ref([])
+const reframeEnabled = ref(false)
+const reframeOffsets = ref({})  // path -> {x, y}
 
 const loadImages = async () => {
   loading.value = true
@@ -128,14 +133,27 @@ const selectAll = (checked) => {
 const setSettings = (settings) => {
   cropPercent.value = settings.crop
   mattePercent.value = settings.matte
+  reframeEnabled.value = settings.reframe || false
 }
 
 const loadPreviews = async () => {
   if (selectedIds.value.size === 0) return
 
   showPreview.value = true
-  previewLoading.value = true
+  previewLoading.value = false  // Don't show loading initially for reframe
   previews.value = []
+
+  // Reset offsets when opening preview
+  reframeOffsets.value = {}
+
+  // For reframe mode with single image, we don't fetch preview immediately
+  // The PreviewModal handles initial display and offset updates
+  if (reframeEnabled.value && selectedIds.value.size === 1) {
+    previewLoading.value = false
+    return
+  }
+
+  previewLoading.value = true
 
   try {
     const res = await fetch('/api/tv/preview', {
@@ -144,7 +162,9 @@ const loadPreviews = async () => {
       body: JSON.stringify({
         paths: Array.from(selectedIds.value),
         crop_percent: cropPercent.value,
-        matte_percent: mattePercent.value
+        matte_percent: mattePercent.value,
+        reframe_enabled: reframeEnabled.value,
+        reframe_offsets: reframeOffsets.value
       })
     })
     const data = await res.json()
@@ -153,6 +173,34 @@ const loadPreviews = async () => {
     console.error('Preview failed:', e)
   } finally {
     previewLoading.value = false
+  }
+}
+
+const fetchPreviewWithOffset = async (path, offsetX, offsetY) => {
+  // Update stored offset
+  reframeOffsets.value = {
+    ...reframeOffsets.value,
+    [path]: { x: offsetX, y: offsetY }
+  }
+
+  try {
+    const res = await fetch('/api/tv/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paths: [path],
+        crop_percent: cropPercent.value,
+        matte_percent: mattePercent.value,
+        reframe_enabled: true,
+        reframe_offsets: { [path]: { x: offsetX, y: offsetY } }
+      })
+    })
+    const data = await res.json()
+    if (data.previews && data.previews.length > 0) {
+      previews.value = data.previews
+    }
+  } catch (e) {
+    console.error('Preview update failed:', e)
   }
 }
 
@@ -173,7 +221,9 @@ const upload = async (display) => {
         paths: Array.from(selectedIds.value),
         crop_percent: cropPercent.value,
         matte_percent: mattePercent.value,
-        display
+        display,
+        reframe_enabled: reframeEnabled.value,
+        reframe_offsets: reframeOffsets.value
       })
     })
     const data = await res.json()
