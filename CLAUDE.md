@@ -6,7 +6,9 @@ Web application for managing artwork on Samsung Frame TVs. FastAPI backend + Vue
 
 ## File Naming Convention
 
-**IMPORTANT:** When creating new files in `_tasks/` directory, use `XX-[FILE_NAME].md` format (e.g. `01-TASK.md`) for easy sorting. Increment XX as needed.
+**IMPORTANT:** When creating new files in `_tasks/` directory, use `XX-[FILE_NAME].md` format (e.g. `01-TASK.md`) for easy sorting. Increment XX only for NEW tasks.
+
+**When working on an existing task** (e.g., `15-task.md`), keep the same `XX-` number for all related content (plans, designs, updates). Do NOT increment the number - all task-related documentation stays under the same prefix.
 
 Tasks, plans, and design documents are ALL stored in the `_tasks/` folder. Do NOT create `docs/`, `plans/`, or similar directories.
 
