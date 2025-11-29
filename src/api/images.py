@@ -75,14 +75,18 @@ async def list_folders():
 
 
 @router.get("/{path:path}/thumbnail")
-async def get_thumbnail(path: str):
+async def get_thumbnail(path: str, size: int = 200):
+    """Get thumbnail for an image. Size parameter controls max dimension (default 200, max 1200)."""
+    # Clamp size between 50 and 1200
+    size = min(max(size, 50), 1200)
+
     image_path = get_safe_path(path)
 
     if not is_valid_image(image_path):
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
-        thumbnail_data = generate_thumbnail(image_path)
+        thumbnail_data = generate_thumbnail(image_path, size)
         return Response(content=thumbnail_data, media_type="image/jpeg")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

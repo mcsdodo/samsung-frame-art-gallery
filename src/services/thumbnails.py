@@ -15,15 +15,20 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg"}
 MAX_WORKERS = 4
 
 
-def get_cache_path(image_path: str) -> Path:
-    """Generate cache path using MD5 hash of image path."""
-    hash_key = hashlib.md5(image_path.encode()).hexdigest()
+def get_cache_path(image_path: str, size: int = 200) -> Path:
+    """Generate cache path using MD5 hash of image path and size."""
+    hash_key = hashlib.md5(f"{image_path}|size={size}".encode()).hexdigest()
     return CACHE_DIR / f"{hash_key}.jpg"
 
 
-def generate_thumbnail(image_path: Path) -> bytes:
-    """Generate thumbnail for a single image, using cache if available."""
-    cache_path = get_cache_path(str(image_path))
+def generate_thumbnail(image_path: Path, size: int = 200) -> bytes:
+    """Generate thumbnail for a single image, using cache if available.
+
+    Args:
+        image_path: Path to the source image
+        size: Maximum dimension (width or height) for the thumbnail
+    """
+    cache_path = get_cache_path(str(image_path), size)
 
     if cache_path.exists():
         return cache_path.read_bytes()
@@ -31,23 +36,23 @@ def generate_thumbnail(image_path: Path) -> bytes:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     with Image.open(image_path) as img:
-        img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+        img.thumbnail((size, size), Image.Resampling.LANCZOS)
 
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
         buffer = BytesIO()
-        img.save(buffer, format="JPEG", quality=80)
+        img.save(buffer, format="JPEG", quality=85)
         thumbnail_data = buffer.getvalue()
 
     cache_path.write_bytes(thumbnail_data)
     return thumbnail_data
 
 
-def _generate_single_thumbnail(image_path: Path) -> tuple[Path, bool, str]:
+def _generate_single_thumbnail(image_path: Path, size: int = 200) -> tuple[Path, bool, str]:
     """Generate thumbnail for a single image. Returns (path, success, error)."""
     try:
-        generate_thumbnail(image_path)
+        generate_thumbnail(image_path, size)
         return (image_path, True, "")
     except Exception as e:
         return (image_path, False, str(e))
