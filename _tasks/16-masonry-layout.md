@@ -1,0 +1,1 @@
+all previews have the same aspect ratio. Let's implement preview for each image with a ratio of the original image. The space should then be filled with previews with various aspect ratios.
