@@ -43,6 +43,8 @@ class PreviewRequest(BaseModel):
     paths: list[str]
     crop_percent: int = 0
     matte_percent: int = 10
+    reframe_enabled: bool = False
+    reframe_offsets: dict[str, dict] = {}  # path -> {"x": 0.5, "y": 0.5}
 
 
 class UploadRequest(BaseModel):
@@ -50,6 +52,8 @@ class UploadRequest(BaseModel):
     crop_percent: int = 0
     matte_percent: int = 10
     display: bool = False
+    reframe_enabled: bool = False
+    reframe_offsets: dict[str, dict] = {}  # path -> {"x": 0.5, "y": 0.5}
 
 
 class TVSettingsRequest(BaseModel):
@@ -202,17 +206,42 @@ async def preview_processed(request: PreviewRequest):
             if not image_path.exists():
                 return None
 
+            # Get reframe offset for this path (default center)
+            offset = request.reframe_offsets.get(path, {"x": 0.5, "y": 0.5})
+            offset_x = offset.get("x", 0.5)
+            offset_y = offset.get("y", 0.5)
+
             # Check cache first
-            cached = cache.get(path, request.crop_percent, request.matte_percent)
+            cached = cache.get(
+                path, request.crop_percent, request.matte_percent,
+                request.reframe_enabled, offset_x, offset_y
+            )
             if cached:
                 original, processed = cached
-            else:
-                image_data = image_path.read_bytes()
-                original, processed = await asyncio.to_thread(
-                    generate_preview, image_data, request.crop_percent, request.matte_percent
-                )
-                # Store in cache
-                cache.set(path, request.crop_percent, request.matte_percent, original, processed)
+                return {
+                    "id": path,
+                    "name": image_path.name,
+                    "original_url": f"data:image/jpeg;base64,{base64.b64encode(original).decode('utf-8')}",
+                    "processed_url": f"data:image/jpeg;base64,{base64.b64encode(processed).decode('utf-8')}"
+                }
+
+            image_data = image_path.read_bytes()
+            original, processed = await asyncio.to_thread(
+                generate_preview,
+                image_data,
+                request.crop_percent,
+                request.matte_percent,
+                request.reframe_enabled,
+                offset_x,
+                offset_y
+            )
+
+            # Store in cache
+            cache.set(
+                path, request.crop_percent, request.matte_percent,
+                original, processed,
+                request.reframe_enabled, offset_x, offset_y
+            )
 
             return {
                 "id": path,
@@ -241,9 +270,20 @@ async def upload_artwork(request: UploadRequest):
             if not image_path.exists():
                 return {"path": path, "success": False, "error": "File not found"}
 
+            # Get reframe offset for this path (default center)
+            offset = request.reframe_offsets.get(path, {"x": 0.5, "y": 0.5})
+            offset_x = offset.get("x", 0.5)
+            offset_y = offset.get("y", 0.5)
+
             image_data = image_path.read_bytes()
             processed_data = await asyncio.to_thread(
-                process_for_tv, image_data, request.crop_percent, request.matte_percent
+                process_for_tv,
+                image_data,
+                request.crop_percent,
+                request.matte_percent,
+                request.reframe_enabled,
+                offset_x,
+                offset_y
             )
 
             return {"path": path, "processed_data": processed_data}
