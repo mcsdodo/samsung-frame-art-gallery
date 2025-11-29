@@ -1,6 +1,16 @@
 <template>
   <div class="crop-settings">
-    <div class="crop-field">
+    <div v-if="allowReframe" class="reframe-field">
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          v-model="reframeValue"
+          @change="emitChange"
+        />
+        Re-framing
+      </label>
+    </div>
+    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
       <label>Crop:</label>
       <input
         type="number"
@@ -8,11 +18,12 @@
         min="0"
         max="50"
         step="1"
+        :disabled="reframeValue && allowReframe"
         @input="emitChange"
       />
       <span class="unit">%</span>
     </div>
-    <div class="crop-field">
+    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
       <label>Matte:</label>
       <input
         type="number"
@@ -20,6 +31,7 @@
         min="0"
         max="50"
         step="1"
+        :disabled="reframeValue && allowReframe"
         @input="emitChange"
       />
       <span class="unit">%</span>
@@ -42,14 +54,23 @@ const props = defineProps({
   hasSelection: {
     type: Boolean,
     default: false
+  },
+  allowReframe: {
+    type: Boolean,
+    default: true
   }
 })
 
+const reframeValue = ref(false)
 const cropValue = ref(0)
 const matteValue = ref(10)
 
 const emitChange = () => {
-  emit('change', { crop: cropValue.value, matte: matteValue.value })
+  emit('change', {
+    crop: cropValue.value,
+    matte: matteValue.value,
+    reframe: props.allowReframe ? reframeValue.value : false
+  })
 }
 
 onMounted(async () => {
@@ -77,10 +98,36 @@ onMounted(async () => {
   align-items: center;
 }
 
+.reframe-field {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .crop-field {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.crop-field.disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .crop-field label {
@@ -100,6 +147,11 @@ onMounted(async () => {
 .crop-field input[type="number"]:focus {
   outline: none;
   border-color: #4a90d9;
+}
+
+.crop-field input[type="number"]:disabled {
+  background: #1a1a2e;
+  color: #666;
 }
 
 .crop-field .unit {

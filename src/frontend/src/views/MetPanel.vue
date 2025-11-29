@@ -67,6 +67,7 @@
       <template #left>
         <CropSettings
           :has-selection="selectedIds.size > 0"
+          :allow-reframe="false"
           @change="setSettings"
           @preview="loadPreviews"
         />
