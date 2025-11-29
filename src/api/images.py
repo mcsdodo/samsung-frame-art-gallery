@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
-from src.services.thumbnails import generate_thumbnail
+from src.services.thumbnails import generate_thumbnail, get_image_dimensions
 
 router = APIRouter()
 
@@ -34,10 +34,13 @@ async def list_images(folder: str = Query(None)):
         for path in IMAGES_DIR.rglob("*"):
             if is_valid_image(path):
                 rel_path = path.relative_to(IMAGES_DIR)
+                width, height = get_image_dimensions(path)
                 images.append({
                     "path": str(rel_path),
                     "name": path.name,
-                    "size": path.stat().st_size
+                    "size": path.stat().st_size,
+                    "width": width,
+                    "height": height
                 })
     else:
         # List images in specific folder only
@@ -49,10 +52,13 @@ async def list_images(folder: str = Query(None)):
         for path in search_dir.iterdir():
             if is_valid_image(path):
                 rel_path = path.relative_to(IMAGES_DIR)
+                width, height = get_image_dimensions(path)
                 images.append({
                     "path": str(rel_path),
                     "name": path.name,
-                    "size": path.stat().st_size
+                    "size": path.stat().st_size,
+                    "width": width,
+                    "height": height
                 })
 
     images.sort(key=lambda x: x["name"].lower())
