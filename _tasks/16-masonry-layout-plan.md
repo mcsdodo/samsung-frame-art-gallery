@@ -216,7 +216,117 @@ git commit -m "feat: add default dimensions to TV artwork API response"
 
 ---
 
-## Task 4: Install masonry library
+## Task 4: Fetch Met image dimensions from headers
+
+**Files:**
+- Modify: `src/services/met_client.py`
+
+**Context:** The Met API provides `primaryImageWidth`/`primaryImageHeight` for many objects, but not all. When missing, `batch_fetch_objects` returns 0. We need to fetch actual dimensions from the image header.
+
+**Step 1: Add function to fetch image dimensions from URL**
+
+Add this function after the `fetch_image` method (around line 259):
+
+```python
+def fetch_image_dimensions(self, image_url: str) -> tuple[int, int]:
+    """Fetch image dimensions by reading just the header bytes.
+
+    Returns: (width, height) tuple, or (0, 0) on failure.
+    """
+    try:
+        from PIL import Image
+        from io import BytesIO
+
+        _LOGGER.debug(f"Fetching dimensions for: {image_url}")
+        req = urllib.request.Request(
+            image_url,
+            headers={
+                "User-Agent": MET_USER_AGENT,
+                "Accept": "image/*",
+                "Range": "bytes=0-65535",  # First 64KB usually contains header
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            header_bytes = response.read()
+
+        # PIL can read dimensions from partial data
+        with Image.open(BytesIO(header_bytes)) as img:
+            return img.size
+    except Exception as e:
+        _LOGGER.warning(f"Failed to fetch dimensions for {image_url}: {e}")
+        return (0, 0)
+```
+
+**Step 2: Update batch_fetch_objects to fetch missing dimensions**
+
+In `batch_fetch_objects` (around line 83), after building the result dict and before appending, add dimension fetching:
+
+Change this section (around lines 98-112):
+
+```python
+                is_low_res = not obj.get("primaryImage")
+                results.append({
+                    "object_id": obj.get("objectID"),
+                    "title": obj.get("title", "Untitled"),
+                    "artist": obj.get("artistDisplayName", "Unknown"),
+                    "date": obj.get("objectDate", ""),
+                    "medium": obj.get("medium", ""),
+                    "department": obj.get("department", ""),
+                    "image_url": primary,
+                    "image_url_small": obj.get("primaryImageSmall", primary),
+                    "width": obj.get("primaryImageWidth") or 0,
+                    "height": obj.get("primaryImageHeight") or 0,
+                    "is_low_res": is_low_res,
+                    "met_url": obj.get("objectURL", "")
+                })
+```
+
+To:
+
+```python
+                is_low_res = not obj.get("primaryImage")
+                width = obj.get("primaryImageWidth") or 0
+                height = obj.get("primaryImageHeight") or 0
+
+                # Fetch dimensions from image header if not provided by API
+                if width == 0 or height == 0:
+                    small_url = obj.get("primaryImageSmall", primary)
+                    width, height = self.fetch_image_dimensions(small_url)
+
+                results.append({
+                    "object_id": obj.get("objectID"),
+                    "title": obj.get("title", "Untitled"),
+                    "artist": obj.get("artistDisplayName", "Unknown"),
+                    "date": obj.get("objectDate", ""),
+                    "medium": obj.get("medium", ""),
+                    "department": obj.get("department", ""),
+                    "image_url": primary,
+                    "image_url_small": obj.get("primaryImageSmall", primary),
+                    "width": width,
+                    "height": height,
+                    "is_low_res": is_low_res,
+                    "met_url": obj.get("objectURL", "")
+                })
+```
+
+**Step 3: Test the change**
+
+```bash
+curl -s "http://localhost:8080/api/met/highlights?page=1" | python -m json.tool | grep -A2 '"width"'
+```
+
+Expected: Objects show actual dimensions instead of 0.
+
+**Step 4: Commit**
+
+```bash
+git add src/services/met_client.py
+git commit -m "feat: fetch Met image dimensions from headers when API doesn't provide them"
+```
+
+---
+
+## Task 5: Install masonry library
 
 **Files:**
 - Modify: `src/frontend/package.json`
@@ -244,7 +354,7 @@ git commit -m "feat: add @yeger/vue-masonry-wall dependency"
 
 ---
 
-## Task 5: Update ImageCard for dynamic aspect ratio
+## Task 6: Update ImageCard for dynamic aspect ratio
 
 **Files:**
 - Modify: `src/frontend/src/components/ImageCard.vue`
@@ -334,7 +444,7 @@ git commit -m "feat: update ImageCard to use dynamic aspect ratio from image dim
 
 ---
 
-## Task 6: Update ImageGrid to use MasonryWall
+## Task 7: Update ImageGrid to use MasonryWall
 
 **Files:**
 - Modify: `src/frontend/src/components/ImageGrid.vue`
@@ -437,7 +547,7 @@ git commit -m "feat: replace CSS grid with MasonryWall component"
 
 ---
 
-## Task 7: Test end-to-end
+## Task 8: Test end-to-end
 
 **Step 1: Rebuild Docker container**
 
@@ -487,9 +597,10 @@ git commit -m "feat: complete masonry layout implementation
 | 1 | Add dimension caching | `src/services/thumbnails.py` |
 | 2 | Add dimensions to image API | `src/api/images.py` |
 | 3 | Add dimensions to TV API | `src/api/tv.py` |
-| 4 | Install masonry library | `package.json` |
-| 5 | Update ImageCard | `ImageCard.vue` |
-| 6 | Update ImageGrid | `ImageGrid.vue` |
-| 7 | End-to-end testing | N/A |
+| 4 | Fetch Met image dimensions | `src/services/met_client.py` |
+| 5 | Install masonry library | `package.json` |
+| 6 | Update ImageCard | `ImageCard.vue` |
+| 7 | Update ImageGrid | `ImageGrid.vue` |
+| 8 | End-to-end testing | N/A |
 
-Total estimated tasks: 7 (with ~5 steps each = ~35 individual steps)
+Total estimated tasks: 8 (with ~4 steps each = ~32 individual steps)
