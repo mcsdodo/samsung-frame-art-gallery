@@ -7,16 +7,26 @@ TARGET_RATIO = 16 / 9  # Samsung Frame TV aspect ratio
 DEFAULT_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10"))
 
 
-def process_for_tv(image_data: bytes, crop_percent: int = 0, matte_percent: int = None) -> bytes:
+def process_for_tv(
+    image_data: bytes,
+    crop_percent: int = 0,
+    matte_percent: int = None,
+    reframe_enabled: bool = False,
+    reframe_offset_x: float = 0.5,
+    reframe_offset_y: float = 0.5
+) -> bytes:
     """
     Process image for TV display:
-    1. Crop: Remove crop_percent from all 4 edges
-    2. Matte: Add white padding for 16:9 output
+    - If reframe_enabled: Scale/crop to fill 16:9 exactly
+    - Otherwise: Crop edges, then add matte for 16:9
 
     Args:
         image_data: Raw image bytes (JPEG/PNG)
         crop_percent: Percentage to crop from each edge (0-50)
         matte_percent: Minimum matte as % of longer side (default from env)
+        reframe_enabled: If True, fill frame completely (no matte)
+        reframe_offset_x: Horizontal crop position (0.0-1.0)
+        reframe_offset_y: Vertical crop position (0.0-1.0)
 
     Returns:
         PNG bytes ready for TV upload
@@ -38,12 +48,14 @@ def process_for_tv(image_data: bytes, crop_percent: int = 0, matte_percent: int 
     elif img.mode != 'RGB':
         img = img.convert('RGB')
 
-    # Step 1: Crop
-    if crop_percent > 0:
-        img = _crop_image(img, crop_percent)
-
-    # Step 2: Add matte for 16:9
-    img = _add_matte(img, matte_percent)
+    if reframe_enabled:
+        # Reframe mode: fill 16:9 completely
+        img = _reframe_image(img, reframe_offset_x, reframe_offset_y)
+    else:
+        # Standard mode: crop then matte
+        if crop_percent > 0:
+            img = _crop_image(img, crop_percent)
+        img = _add_matte(img, matte_percent)
 
     # Output as PNG
     output = io.BytesIO()
@@ -63,6 +75,47 @@ def _crop_image(img: Image.Image, crop_percent: int) -> Image.Image:
     bottom = h - crop_y
 
     return img.crop((left, top, right, bottom))
+
+
+def _reframe_image(img: Image.Image, offset_x: float = 0.5, offset_y: float = 0.5) -> Image.Image:
+    """
+    Scale and crop image to fill 16:9 frame exactly.
+
+    Args:
+        img: Source image
+        offset_x: Horizontal position 0.0 (left) to 1.0 (right), 0.5 = center
+        offset_y: Vertical position 0.0 (top) to 1.0 (bottom), 0.5 = center
+
+    Returns:
+        Image cropped to exact 16:9 aspect ratio
+    """
+    # Clamp offsets to valid range
+    offset_x = max(0.0, min(1.0, offset_x))
+    offset_y = max(0.0, min(1.0, offset_y))
+
+    w, h = img.size
+    current_ratio = w / h
+
+    # Handle edge case: image already exactly 16:9
+    if abs(current_ratio - TARGET_RATIO) < 0.001:
+        return img
+
+    if current_ratio > TARGET_RATIO:
+        # Image is wider than 16:9 - crop sides
+        new_w = int(h * TARGET_RATIO)
+        new_h = h
+        max_offset = w - new_w
+        left = int(max_offset * offset_x)
+        top = 0
+    else:
+        # Image is taller than 16:9 - crop top/bottom
+        new_w = w
+        new_h = int(w / TARGET_RATIO)
+        max_offset = h - new_h
+        left = 0
+        top = int(max_offset * offset_y)
+
+    return img.crop((left, top, left + new_w, top + new_h))
 
 
 def _add_matte(img: Image.Image, matte_percent: int) -> Image.Image:
@@ -101,7 +154,14 @@ def _add_matte(img: Image.Image, matte_percent: int) -> Image.Image:
     return canvas
 
 
-def generate_preview(image_data: bytes, crop_percent: int = 0, matte_percent: int = None) -> tuple[bytes, bytes]:
+def generate_preview(
+    image_data: bytes,
+    crop_percent: int = 0,
+    matte_percent: int = None,
+    reframe_enabled: bool = False,
+    reframe_offset_x: float = 0.5,
+    reframe_offset_y: float = 0.5
+) -> tuple[bytes, bytes]:
     """
     Generate preview images for comparison.
 
@@ -118,7 +178,10 @@ def generate_preview(image_data: bytes, crop_percent: int = 0, matte_percent: in
     original.save(orig_output, format='JPEG', quality=85)
 
     # Processed thumbnail
-    processed_full = process_for_tv(image_data, crop_percent, matte_percent)
+    processed_full = process_for_tv(
+        image_data, crop_percent, matte_percent,
+        reframe_enabled, reframe_offset_x, reframe_offset_y
+    )
     processed = Image.open(io.BytesIO(processed_full))
     processed.thumbnail((400, 400), Image.Resampling.LANCZOS)
 
