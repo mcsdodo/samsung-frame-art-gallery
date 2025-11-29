@@ -146,6 +146,13 @@ async def list_artwork():
     client = require_tv_client()
     try:
         artwork = await asyncio.to_thread(client.get_artwork_list)
+        # Add default dimensions (TV API doesn't provide them)
+        # Using 16:9 as default since TV displays in that ratio
+        for item in artwork:
+            if "width" not in item:
+                item["width"] = 1920
+            if "height" not in item:
+                item["height"] = 1080
         return {"artwork": artwork, "count": len(artwork)}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
