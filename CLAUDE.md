@@ -10,7 +10,7 @@ Web application for managing artwork on Samsung Frame TVs. Features local image 
 
 **When working on an existing task** (e.g., `15-task.md`), keep the same `XX-` number for all related content (plans, designs, updates). Do NOT increment the number - all task-related documentation stays under the same prefix.
 
-Tasks, plans, and design documents are ALL stored in the `_tasks/` folder. Do NOT create `docs/`, `plans/`, or similar directories.
+Tasks, plans, and design documents are ALL stored in the `_tasks/` folder. Do NOT create `docs/`, `plans/`, or similar directories. **In plan mode, save the plan file to `_tasks/` instead of `.claude/plans/`.**
 
 ## Project Structure
 

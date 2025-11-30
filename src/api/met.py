@@ -31,28 +31,28 @@ async def get_departments():
 async def get_highlights(page: int = 1, page_size: int = 48, medium: str = None):
     """Get highlighted artworks, paginated."""
     client = get_met_client()
-    return await asyncio.to_thread(client.get_highlights, page, page_size, medium)
+    return await client.get_highlights_async(page, page_size, medium)
 
 
 @router.get("/medium/{medium}")
 async def get_by_medium(medium: str, page: int = 1, page_size: int = 48, highlights: bool = False):
     """Get artworks by medium (e.g., Paintings, Sculpture), paginated."""
     client = get_met_client()
-    return await asyncio.to_thread(client.get_by_medium, medium, page, page_size, highlights)
+    return await client.get_by_medium_async(medium, page, page_size, highlights)
 
 
 @router.get("/objects")
 async def get_objects(department_id: int, page: int = 1, page_size: int = 48, highlights: bool = False):
     """Get artworks by department, paginated."""
     client = get_met_client()
-    return await asyncio.to_thread(client.get_by_department, department_id, page, page_size, highlights)
+    return await client.get_by_department_async(department_id, page, page_size, highlights)
 
 
 @router.get("/search")
 async def search_objects(q: str, department_id: int = None, medium: str = None, highlights: bool = False, page: int = 1, page_size: int = 48):
     """Search artworks by keyword, optionally filtered by department, medium, or highlights."""
     client = get_met_client()
-    return await asyncio.to_thread(client.search, q, department_id, medium, highlights, page, page_size)
+    return await client.search_async(q, department_id, medium, highlights, page, page_size)
 
 
 @router.get("/object/{object_id}")
@@ -101,7 +101,8 @@ async def preview_met_artwork(request: MetPreviewRequest):
                 if not obj:
                     return None
 
-                image_url = obj.get("primaryImage") or obj.get("primaryImageSmall")
+                # Use small image for preview (faster download), full image for upload
+                image_url = obj.get("primaryImageSmall") or obj.get("primaryImage")
                 if not image_url:
                     return None
 
