@@ -37,14 +37,30 @@ const tabs = [
   { id: 'met', label: 'Metropolitan Museum of Art' }
 ]
 
-// Read initial tab from URL, default to 'met'
-const getInitialTab = () => {
+// Read tab from URL if specified
+const getUrlTab = () => {
   const params = new URLSearchParams(window.location.search)
-  const tab = params.get('tab')
-  return tab === 'local' ? 'local' : 'met'
+  return params.get('tab')
 }
 
-const activeTab = ref(getInitialTab())
+// Start with 'local', will switch to 'met' if no local images
+const activeTab = ref(getUrlTab() || 'local')
+
+// Check for local images and switch to Met if none exist
+onMounted(async () => {
+  // Only auto-switch if no tab specified in URL
+  if (!getUrlTab()) {
+    try {
+      const res = await fetch('/api/images')
+      const data = await res.json()
+      if (!data.images || data.images.length === 0) {
+        activeTab.value = 'met'
+      }
+    } catch (e) {
+      // If fetch fails, stay on local tab
+    }
+  }
+})
 
 // Update URL when tab changes
 watch(activeTab, (newTab) => {
