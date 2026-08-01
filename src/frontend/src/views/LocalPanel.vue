@@ -6,6 +6,21 @@
           :class="{ active: !currentFolder }"
           @click="currentFolder = null"
         >All</button>
+        <button
+          class="secondary"
+          @click="openFilePicker"
+        >
+        Upload Images
+       </button>
+
+       <input
+         ref="fileInput"
+         type="file"
+         accept=".jpg,.jpeg"
+         multiple
+         hidden
+         @change="uploadImages"
+       /> 
         <select v-if="folders.length" v-model="currentFolder">
           <option :value="null">All Folders</option>
           <option v-for="f in folders" :key="f" :value="f">{{ f }}</option>
@@ -100,6 +115,41 @@ const previews = ref([])
 const reframeEnabled = ref(false)
 const reframeOffsets = ref({})  // path -> {x, y}
 const showCollectionPicker = ref(false)
+
+const fileInput = ref(null)
+
+const openFilePicker = () => {
+  fileInput.value.click()
+}
+
+const uploadImages = async (event) => {
+  const files = event.target.files
+
+  if (!files.length) return
+
+  const formData = new FormData()
+
+  for (const file of files) {
+    formData.append("files", file)
+  }
+
+  try {
+    const response = await fetch("/api/images/upload", {
+      method: "POST",
+      body: formData
+    })
+
+    const result = await response.json()
+    console.log("Upload result:", result)
+
+    await loadImages()
+
+  } catch (error) {
+    console.error("Upload failed:", error)
+  }
+
+  event.target.value = ""
+} 
 
 const selectedItemsForCollection = computed(() => {
   return Array.from(selectedIds.value).map(path => ({
