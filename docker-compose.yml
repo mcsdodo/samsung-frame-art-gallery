@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ${IMAGES_DIR:-./images}:/images:ro
+      - ${IMAGES_DIR:-./images}:/images
       - ./data/thumbnails:/thumbnails
       - ./data:/app/data
     environment:
