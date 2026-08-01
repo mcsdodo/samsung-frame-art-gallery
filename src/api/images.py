@@ -1,6 +1,8 @@
 import os
+
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File
+from typing import List
 from fastapi.responses import Response
 
 from src.services.thumbnails import generate_thumbnail, get_image_dimensions
@@ -79,6 +81,26 @@ async def list_folders():
     folders.sort()
     return {"folders": folders}
 
+
+@router.post("/upload")
+async def upload_images(files: List[UploadFile] = File(...)):
+    uploaded = []
+
+    for file in files:
+        if not file.filename.lower().endswith((".jpg", ".jpeg")):
+            continue
+
+        destination = IMAGES_DIR / file.filename
+
+        with destination.open("wb") as buffer:
+            buffer.write(await file.read())
+
+        uploaded.append(file.filename)
+
+    return {
+        "uploaded": uploaded,
+        "count": len(uploaded)
+    }
 
 @router.get("/{path:path}/thumbnail")
 async def get_thumbnail(path: str, size: int = 200):
