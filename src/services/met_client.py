@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 import urllib.request
+import urllib.parse
 import json
 
 _LOGGER = logging.getLogger(__name__)
 
 MET_API_BASE = "https://collectionapi.metmuseum.org/public/collection/v1"
+MET_SEARCH_URL = "https://collectionapi.metmuseum.org/public/collection/v1.1/search"
 MET_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 DIMENSIONS_CACHE_DIR = Path(os.environ.get("THUMBNAILS_DIR", "/thumbnails")) / "met_dims"
 
@@ -192,32 +194,45 @@ class MetClient:
 
         return results
 
-    def _get_object_ids(self, endpoint: str, cache_key: str) -> list[int]:
-        """Fetch and cache object IDs from search/objects endpoint."""
+    def _get_search_page(self, endpoint: str, cache_key: str, page: int, page_size: int) -> dict:
+        """Fetch one v1.1 search page; totals describe the full result set.
+
+        The Met search API only allows offsets plus limits up to 10,000.
+        Object details and departments continue to use the v1 API.
+        """
+        if page < 1 or not 1 <= page_size <= 500:
+            raise ValueError("page must be positive and page_size must be between 1 and 500")
+        offset = (page - 1) * page_size
+        if offset >= 10000:
+            return {"objectIDs": [], "total": 0}
+        limit = min(page_size, 10000 - offset)
+        cache_key = f"{cache_key}:page:{page}:size:{page_size}"
         cached = self._get_cached(cache_key)
-        if cached:
+        if cached is not None:
             return cached
 
-        data = self._fetch_json(endpoint)
-        object_ids = data.get("objectIDs") or []
-        # Cache for 1 hour
-        self._set_cached(cache_key, object_ids, self._objects_ttl)
-        return object_ids
+        parsed = urllib.parse.urlsplit(endpoint)
+        params = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        params.extend([("offset", str(offset)), ("limit", str(limit))])
+        url = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(params)))
+        data = self._fetch_json(url)
+        self._set_cached(cache_key, data, self._objects_ttl)
+        return data
 
     def get_highlights(self, page: int = 1, page_size: int = 24, medium: Optional[str] = None) -> dict:
         """Get highlighted artworks with images, paginated."""
         if medium:
             cache_key = f"highlights:{medium}:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
+            url = f"{MET_SEARCH_URL}?isHighlight=true&hasImages=true&medium={urllib.parse.quote(medium)}&q=*"
         else:
             cache_key = "highlights:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
-        all_ids = self._get_object_ids(url, cache_key)
+            url = f"{MET_SEARCH_URL}?isHighlight=true&hasImages=true&q=*"
+        data = self._get_search_page(url, cache_key, page, page_size)
 
-        total = len(all_ids)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = self.batch_fetch_objects(page_ids)
 
@@ -226,7 +241,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     def get_by_medium(self, medium: str, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
@@ -238,13 +253,13 @@ class MetClient:
         cache_key = f"medium:{medium}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
-        all_ids = self._get_object_ids(url, cache_key)
+        url = f"{MET_SEARCH_URL}?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
+        data = self._get_search_page(url, cache_key, page, page_size)
 
-        total = len(all_ids)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = self.batch_fetch_objects(page_ids)
 
@@ -253,7 +268,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     def get_by_department(self, department_id: int, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
@@ -262,13 +277,13 @@ class MetClient:
         cache_key = f"department:{department_id}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
-        all_ids = self._get_object_ids(url, cache_key)
+        url = f"{MET_SEARCH_URL}?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
+        data = self._get_search_page(url, cache_key, page, page_size)
 
-        total = len(all_ids)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = self.batch_fetch_objects(page_ids)
 
@@ -277,7 +292,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     def search(self, query: str, department_id: Optional[int] = None, medium: Optional[str] = None, highlights_only: bool = False, page: int = 1, page_size: int = 24) -> dict:
@@ -305,14 +320,14 @@ class MetClient:
         params.append(f"q={encoded_query}")
 
         cache_key = ":".join(cache_parts) + ":ids"
-        url = f"{MET_API_BASE}/search?" + "&".join(params)
+        url = f"{MET_SEARCH_URL}?" + "&".join(params)
 
-        all_ids = self._get_object_ids(url, cache_key)
+        data = self._get_search_page(url, cache_key, page, page_size)
 
-        total = len(all_ids)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = self.batch_fetch_objects(page_ids)
 
@@ -321,7 +336,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total,
+            "has_more": end < min(total, 10000),
             "query": query
         }
 
@@ -330,16 +345,16 @@ class MetClient:
         """Get highlighted artworks with images, paginated (async parallel fetch)."""
         if medium:
             cache_key = f"highlights:{medium}:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
+            url = f"{MET_SEARCH_URL}?isHighlight=true&hasImages=true&medium={urllib.parse.quote(medium)}&q=*"
         else:
             cache_key = "highlights:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+            url = f"{MET_SEARCH_URL}?isHighlight=true&hasImages=true&q=*"
 
-        all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
-        total = len(all_ids)
+        data = await asyncio.to_thread(self._get_search_page, url, cache_key, page, page_size)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = await self.batch_fetch_objects_async(page_ids)
 
@@ -348,7 +363,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     async def get_by_medium_async(self, medium: str, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
@@ -360,13 +375,13 @@ class MetClient:
         cache_key = f"medium:{medium}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
+        url = f"{MET_SEARCH_URL}?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
 
-        all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
-        total = len(all_ids)
+        data = await asyncio.to_thread(self._get_search_page, url, cache_key, page, page_size)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = await self.batch_fetch_objects_async(page_ids)
 
@@ -375,7 +390,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     async def get_by_department_async(self, department_id: int, page: int = 1, page_size: int = 24, highlights_only: bool = False) -> dict:
@@ -384,13 +399,13 @@ class MetClient:
         cache_key = f"department:{department_id}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
+        url = f"{MET_SEARCH_URL}?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
 
-        all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
-        total = len(all_ids)
+        data = await asyncio.to_thread(self._get_search_page, url, cache_key, page, page_size)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = await self.batch_fetch_objects_async(page_ids)
 
@@ -399,7 +414,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total
+            "has_more": end < min(total, 10000)
         }
 
     async def search_async(self, query: str, department_id: Optional[int] = None, medium: Optional[str] = None, highlights_only: bool = False, page: int = 1, page_size: int = 24) -> dict:
@@ -423,13 +438,13 @@ class MetClient:
 
         params.append(f"q={encoded_query}")
         cache_key = ":".join(cache_parts) + ":ids"
-        url = f"{MET_API_BASE}/search?" + "&".join(params)
+        url = f"{MET_SEARCH_URL}?" + "&".join(params)
 
-        all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
-        total = len(all_ids)
+        data = await asyncio.to_thread(self._get_search_page, url, cache_key, page, page_size)
+        total = data.get("total", 0)
         start = (page - 1) * page_size
         end = start + page_size
-        page_ids = all_ids[start:end]
+        page_ids = data.get("objectIDs") or []
 
         objects = await self.batch_fetch_objects_async(page_ids)
 
@@ -438,7 +453,7 @@ class MetClient:
             "total": total,
             "page": page,
             "page_size": page_size,
-            "has_more": end < total,
+            "has_more": end < min(total, 10000),
             "query": query
         }
 
