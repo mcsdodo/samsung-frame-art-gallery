@@ -40,14 +40,20 @@
           </template>
         </div>
       </div>
-      <button class="refresh-btn" @click="loadArtwork" :disabled="loading">
-        Refresh
-      </button>
+      <div class="header-right">
+        <select v-model="sortOrder" class="duration-select" title="Sort">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+        <button class="refresh-btn" @click="loadArtwork" :disabled="loading">
+          Refresh
+        </button>
+      </div>
     </div>
 
     <!-- Row 3: Image grid -->
     <ImageGrid
-      :images="artwork"
+      :images="sortedArtwork"
       :selected-ids="selectedIds"
       :current-id="currentId"
       :loading="loading"
@@ -81,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
 
@@ -92,6 +98,19 @@ const currentId = ref(null)
 const selectedIds = ref(new Set())
 const loading = ref(false)
 const deleting = ref(false)
+
+let savedSort = 'newest'
+try { savedSort = localStorage.getItem('tvSort') || 'newest' } catch {}
+const sortOrder = ref(savedSort)
+watch(sortOrder, v => { try { localStorage.setItem('tvSort', v) } catch {} })
+
+// image_date is "YYYY:MM:DD HH:MM:SS", so it sorts correctly as a string
+const sortedArtwork = computed(() => {
+  const dir = sortOrder.value === 'oldest' ? 1 : -1
+  return [...artwork.value].sort((a, b) =>
+    dir * ((a.image_date || '').localeCompare(b.image_date || '') ||
+           (a.content_id || '').localeCompare(b.content_id || '')))
+})
 
 // Slideshow state
 const connected = ref(false)
@@ -111,6 +130,10 @@ const loadArtwork = async () => {
     const currentData = await currentRes.json()
 
     artwork.value = artData.artwork || []
+    // Lets the local panel mark files that are already on the TV
+    window.dispatchEvent(new CustomEvent('tv-artwork-loaded', {
+      detail: artwork.value.map(a => a.source_path).filter(Boolean)
+    }))
     currentId.value = currentData.content_id || null
     selectedIds.value = new Set()
 
@@ -289,6 +312,12 @@ defineExpose({ loadArtwork })
 .duration-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .refresh-btn {

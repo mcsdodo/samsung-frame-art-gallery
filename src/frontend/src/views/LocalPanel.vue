@@ -11,11 +11,23 @@
           <option v-for="f in folders" :key="f" :value="f">{{ f }}</option>
         </select>
       </div>
+      <div class="sort-controls">
+        <label class="toggle-label">
+          <input type="checkbox" v-model="hideOnTv" />
+          <span>Hide on TV ({{ onTvCount }})</span>
+        </label>
+        <select v-model="sortOrder" class="sort-select" title="Sort">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
     </div>
 
     <ImageGrid
-      :images="images"
+      :images="sortedImages"
       :selected-ids="selectedIds"
+      :on-tv-paths="onTvPaths"
       :loading="loading"
       :is-local="true"
       @toggle="toggleSelection"
@@ -67,6 +79,14 @@
       @offset-change="fetchPreviewWithOffset"
     />
 
+    <UploadProgress
+      v-if="uploadItems.length"
+      :items="uploadItems"
+      :stopping="stopRequested"
+      @stop="stopRequested = true"
+      @close="uploadItems = []"
+    />
+
     <CollectionPicker
       v-if="showCollectionPicker"
       :items="selectedItemsForCollection"
@@ -77,12 +97,13 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
 import CropSettings from '../components/CropSettings.vue'
 import PreviewModal from '../components/PreviewModal.vue'
 import CollectionPicker from '../components/CollectionPicker.vue'
+import UploadProgress from '../components/UploadProgress.vue'
 
 const emit = defineEmits(['uploaded', 'preview'])
 
@@ -100,6 +121,32 @@ const previews = ref([])
 const reframeEnabled = ref(false)
 const reframeOffsets = ref({})  // path -> {x, y}
 const showCollectionPicker = ref(false)
+const uploadItems = ref([])  // drives the progress overlay; empty = hidden
+const stopRequested = ref(false)
+const onTvPaths = ref(new Set())
+
+const readPref = (key, fallback) => {
+  try { return localStorage.getItem(key) || fallback } catch { return fallback }
+}
+const sortOrder = ref(readPref('localSort', 'newest'))
+const hideOnTv = ref(readPref('localHideOnTv', '') === '1')
+watch(sortOrder, v => { try { localStorage.setItem('localSort', v) } catch {} })
+watch(hideOnTv, v => { try { localStorage.setItem('localHideOnTv', v ? '1' : '') } catch {} })
+
+const onTvCount = computed(() => images.value.filter(i => onTvPaths.value.has(i.path)).length)
+
+const sortedImages = computed(() => {
+  const list = hideOnTv.value
+    ? images.value.filter(i => !onTvPaths.value.has(i.path))
+    : [...images.value]
+  if (sortOrder.value === 'name') {
+    return list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }
+  const dir = sortOrder.value === 'oldest' ? 1 : -1
+  return list.sort((a, b) => dir * ((a.mtime || 0) - (b.mtime || 0)))
+})
+
+const onTvArtwork = (e) => { onTvPaths.value = new Set(e.detail) }
 
 const selectedItemsForCollection = computed(() => {
   return Array.from(selectedIds.value).map(path => ({
@@ -147,7 +194,7 @@ const toggleSelection = (image) => {
 
 const selectAll = (checked) => {
   if (checked) {
-    selectedIds.value = new Set(images.value.map(i => i.path))
+    selectedIds.value = new Set(sortedImages.value.map(i => i.path))
   } else {
     selectedIds.value = new Set()
   }
@@ -232,29 +279,53 @@ const uploadFromPreview = async () => {
   await upload(false)
 }
 
+// One request per image so the overlay can show real progress; the TV takes uploads one at a time anyway.
 const upload = async (display) => {
   if (selectedIds.value.size === 0) return
 
+  const names = new Map(images.value.map(i => [i.path, i.name]))
+  // In on-screen order; selected images hidden by a filter still go, at the end
+  const order = new Map(sortedImages.value.map((i, k) => [i.path, k]))
+  const paths = [...selectedIds.value].sort((a, b) => (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity))
+  uploadItems.value = paths.map(path => ({ path, name: names.get(path) || path, status: 'pending', error: '' }))
+  stopRequested.value = false
   uploading.value = true
+
   try {
-    const res = await fetch('/api/tv/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paths: Array.from(selectedIds.value),
-        crop_percent: cropPercent.value,
-        matte_percent: mattePercent.value,
-        display,
-        reframe_enabled: reframeEnabled.value,
-        reframe_offsets: reframeOffsets.value
-      })
-    })
-    const data = await res.json()
-    console.log('Upload results:', data)
-    selectedIds.value = new Set()
+    for (const [index, item] of uploadItems.value.entries()) {
+      if (stopRequested.value) {
+        item.status = 'skipped'
+        continue
+      }
+      item.status = 'uploading'
+      try {
+        const res = await fetch('/api/tv/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paths: [item.path],
+            crop_percent: cropPercent.value,
+            matte_percent: mattePercent.value,
+            display: display && index === uploadItems.value.length - 1,
+            reframe_enabled: reframeEnabled.value,
+            reframe_offsets: reframeOffsets.value[item.path] ? { [item.path]: reframeOffsets.value[item.path] } : {}
+          })
+        })
+        const data = await res.json().catch(() => ({}))
+        const result = data.results?.[0]
+        if (res.ok && result?.success) {
+          item.status = 'done'
+        } else {
+          item.status = 'failed'
+          item.error = result?.error || data.detail || `HTTP ${res.status}`
+        }
+      } catch (e) {
+        item.status = 'failed'
+        item.error = e.message || 'Network error'
+      }
+    }
+    selectedIds.value = new Set(uploadItems.value.filter(i => i.status !== 'done').map(i => i.path))
     emit('uploaded')
-  } catch (e) {
-    console.error('Upload failed:', e)
   } finally {
     uploading.value = false
   }
@@ -272,6 +343,9 @@ onMounted(() => {
   loadImages()
   loadFolders()
 })
+
+window.addEventListener('tv-artwork-loaded', onTvArtwork)
+onUnmounted(() => window.removeEventListener('tv-artwork-loaded', onTvArtwork))
 </script>
 
 <style scoped>
@@ -314,6 +388,22 @@ onMounted(() => {
   border-color: #4a90d9;
 }
 
+.sort-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.sort-select,
 .folder-select select {
   padding: 0.4rem;
   border-radius: 4px;

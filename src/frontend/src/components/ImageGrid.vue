@@ -40,6 +40,7 @@
             :image="item"
             :selected="selectedIds.has(item._id || item.path || item.object_id || item.content_id)"
             :is-current="currentId === (item.content_id)"
+            :on-tv="onTvPaths.has(item.path)"
             :is-local="isLocal"
             @toggle="$emit('toggle', item)"
             @preview="$emit('preview', item)"
@@ -67,6 +68,7 @@ const props = defineProps({
   images: { type: Array, default: () => [] },
   selectedIds: { type: Set, default: () => new Set() },
   currentId: { type: String, default: null },
+  onTvPaths: { type: Set, default: () => new Set() },
   loading: { type: Boolean, default: false },
   loadingMore: { type: Boolean, default: false },
   isLocal: { type: Boolean, default: true },

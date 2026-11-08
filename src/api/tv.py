@@ -13,6 +13,7 @@ from src.services.tv_settings import load_settings, save_settings, TVSettings
 from src.services.tv_discovery import discover_tvs
 from src.services.image_processor import process_for_tv, generate_preview
 from src.services.preview_cache import get_preview_cache
+from src.services import upload_registry
 
 router = APIRouter()
 
@@ -159,6 +160,10 @@ async def list_artwork():
                 item["width"] = 1920
             if "height" not in item:
                 item["height"] = 1080
+        sources = upload_registry.prune({a["content_id"] for a in artwork})
+        for item in artwork:
+            if item["content_id"] in sources:
+                item["source_path"] = sources[item["content_id"]]["path"]
         return {"artwork": artwork, "count": len(artwork)}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -188,6 +193,7 @@ async def delete_artwork(content_id: str):
     client = require_tv_client()
     try:
         await asyncio.to_thread(client.delete_artwork, content_id)
+        upload_registry.forget([content_id])
         return {"success": True, "deleted": content_id}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -320,6 +326,8 @@ async def upload_artwork(request: UploadRequest):
                 item["processed_data"],
                 display_this
             )
+            if result.get("content_id"):
+                upload_registry.record(result["content_id"], item["path"])
             results.append({"path": item["path"], "success": True, "result": result})
         except Exception as e:
             results.append({"path": item["path"], "success": False, "error": str(e)})

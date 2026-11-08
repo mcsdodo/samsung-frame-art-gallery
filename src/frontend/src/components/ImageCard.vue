@@ -2,7 +2,7 @@
   <div
     ref="cardRef"
     class="image-card"
-    :class="{ selected, current: isCurrent }"
+    :class="{ selected, current: isCurrent, 'on-tv': onTv }"
     :style="{ aspectRatio: computedAspectRatio }"
     @click="$emit('toggle')"
     @dblclick.stop="$emit('preview')"
@@ -28,6 +28,7 @@
     <div class="overlay">
       <span class="name">{{ displayName }}</span>
       <span v-if="isCurrent" class="current-badge">NOW</span>
+      <span v-if="onTv" class="on-tv-badge" title="Already uploaded to the TV">ON TV</span>
     </div>
   </div>
 </template>
@@ -42,6 +43,7 @@ const props = defineProps({
   image: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   isCurrent: { type: Boolean, default: false },
+  onTv: { type: Boolean, default: false },
   isLocal: { type: Boolean, default: true }
 })
 
@@ -129,6 +131,10 @@ const thumbnailUrl = computed(() => {
 const displayName = computed(() => {
   if (props.isLocal) {
     return props.image.name
+  }
+  // TV artwork uploaded from this app: show the file it came from
+  if (props.image.source_path) {
+    return props.image.source_path.split('/').pop().replace(/\.jpe?g$/i, '')
   }
   // Met images have title
   if (props.image.title) {
@@ -241,6 +247,20 @@ img.loaded {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 70%;
+}
+
+.on-tv-badge {
+  background: #4a90d9;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.image-card.on-tv:not(.selected) img {
+  opacity: 0.55;
 }
 
 .current-badge {
