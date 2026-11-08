@@ -106,7 +106,7 @@ const imageName = computed(() => {
 }
 
 .loading {
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.2rem;
 }
 

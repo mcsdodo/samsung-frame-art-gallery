@@ -13,6 +13,7 @@ from src.services.tv_settings import load_settings, save_settings, TVSettings
 from src.services.tv_discovery import discover_tvs
 from src.services.image_processor import process_for_tv, generate_preview
 from src.services.preview_cache import get_preview_cache
+from src.services import upload_registry, labels
 
 router = APIRouter()
 
@@ -66,6 +67,13 @@ class SlideshowRequest(BaseModel):
     enabled: bool
     duration: int = 15  # minutes
     shuffle: bool = True
+    label: Optional[str] = None  # play only artwork with this label; None = all
+
+
+class LabelsRequest(BaseModel):
+    content_ids: list[str]
+    add: list[str] = []
+    remove: list[str] = []
 
 
 DEFAULT_MATTE_PERCENT = int(os.environ.get("DEFAULT_MATTE_PERCENT", "10"))
@@ -159,6 +167,13 @@ async def list_artwork():
                 item["width"] = 1920
             if "height" not in item:
                 item["height"] = 1080
+        live_ids = {a["content_id"] for a in artwork}
+        sources = upload_registry.prune(live_ids)
+        item_labels = labels.prune(live_ids)
+        for item in artwork:
+            if item["content_id"] in sources:
+                item["source_path"] = sources[item["content_id"]]["path"]
+            item["labels"] = item_labels.get(item["content_id"], [])
         return {"artwork": artwork, "count": len(artwork)}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -188,6 +203,8 @@ async def delete_artwork(content_id: str):
     client = require_tv_client()
     try:
         await asyncio.to_thread(client.delete_artwork, content_id)
+        upload_registry.forget([content_id])
+        labels.forget([content_id])
         return {"success": True, "deleted": content_id}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -320,11 +337,28 @@ async def upload_artwork(request: UploadRequest):
                 item["processed_data"],
                 display_this
             )
+            if result.get("content_id"):
+                upload_registry.record(result["content_id"], item["path"])
             results.append({"path": item["path"], "success": True, "result": result})
         except Exception as e:
             results.append({"path": item["path"], "success": False, "error": str(e)})
 
     return {"results": results}
+
+
+@router.post("/labels")
+async def change_labels(request: LabelsRequest):
+    """Add/remove labels on artwork; keeps a running label slideshow in step."""
+    updated = labels.change(request.content_ids, request.add, request.remove)
+    active = labels.get_slideshow_label()
+    if active and active in set(request.add) | set(request.remove):
+        client = get_tv_client()
+        if client is not None:
+            try:
+                await asyncio.to_thread(client.sync_favourites, labels.ids_with(active))
+            except Exception as e:
+                raise HTTPException(status_code=503, detail=f"Labels saved, but the TV slideshow was not updated: {e}")
+    return {"labels": updated}
 
 
 @router.get("/slideshow")
@@ -333,6 +367,9 @@ async def get_slideshow_status():
     client = require_tv_client()
     try:
         status = await asyncio.to_thread(client.get_slideshow_status)
+        if isinstance(status, dict) and "error" not in status:
+            playing_favourites = status.get("category_id") == "MY-C0004"
+            status["label"] = labels.get_slideshow_label() if playing_favourites else None
         return status
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -343,14 +380,23 @@ async def set_slideshow_status(request: SlideshowRequest):
     """Set slideshow status."""
     client = require_tv_client()
     try:
+        category = 2
+        if request.enabled and request.label:
+            wanted = labels.ids_with(request.label)
+            if not wanted:
+                raise HTTPException(status_code=400, detail=f"No artwork is labelled '{request.label}'")
+            await asyncio.to_thread(client.sync_favourites, wanted)
+            category = 4
         result = await asyncio.to_thread(
             client.set_slideshow_status,
             request.enabled,
             request.duration,
-            request.shuffle
+            request.shuffle,
+            category
         )
         if "error" in result:
             raise HTTPException(status_code=503, detail=result["error"])
+        labels.set_slideshow_label(request.label if category == 4 else None)
         return {"success": True, **result}
     except HTTPException:
         raise

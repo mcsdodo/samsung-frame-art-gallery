@@ -49,7 +49,7 @@ const formatResolution = (img) => {
 }
 
 .modal {
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 1.5rem;
   max-width: 500px;
@@ -60,11 +60,11 @@ const formatResolution = (img) => {
 
 .modal h3 {
   margin: 0 0 1rem;
-  color: #ffaa00;
+  color: var(--warning);
 }
 
 .modal p {
-  color: #aaa;
+  color: var(--text-muted);
   margin-bottom: 1rem;
 }
 
@@ -80,7 +80,7 @@ const formatResolution = (img) => {
   display: flex;
   justify-content: space-between;
   padding: 0.5rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
 }
 
 .image-list li strong {
@@ -93,7 +93,7 @@ const formatResolution = (img) => {
 }
 
 .resolution {
-  color: #ff6666;
+  color: var(--danger);
   font-family: monospace;
   white-space: nowrap;
 }
@@ -112,12 +112,12 @@ const formatResolution = (img) => {
 }
 
 .actions .secondary {
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
 }
 
 .actions .primary {
-  background: #4a90d9;
+  background: var(--accent);
   color: white;
 }
 </style>

@@ -2,7 +2,7 @@
   <div
     ref="cardRef"
     class="image-card"
-    :class="{ selected, current: isCurrent }"
+    :class="{ selected, current: isCurrent, 'on-tv': onTv }"
     :style="{ aspectRatio: computedAspectRatio }"
     @click="$emit('toggle')"
     @dblclick.stop="$emit('preview')"
@@ -27,7 +27,12 @@
     </div>
     <div class="overlay">
       <span class="name">{{ displayName }}</span>
-      <span v-if="isCurrent" class="current-badge">NOW</span>
+      <span v-if="isCurrent" class="current-badge">Now showing</span>
+      <span v-if="onTv" class="on-tv-badge" title="Already uploaded to the TV">On TV</span>
+      <span v-if="image.labels?.length" class="label-chips" :title="image.labels.join(', ')">
+        <span class="label-chip">{{ image.labels[0] }}</span>
+        <span v-if="image.labels.length > 1" class="label-chip more">+{{ image.labels.length - 1 }}</span>
+      </span>
     </div>
   </div>
 </template>
@@ -42,6 +47,7 @@ const props = defineProps({
   image: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   isCurrent: { type: Boolean, default: false },
+  onTv: { type: Boolean, default: false },
   isLocal: { type: Boolean, default: true }
 })
 
@@ -130,6 +136,10 @@ const displayName = computed(() => {
   if (props.isLocal) {
     return props.image.name
   }
+  // TV artwork uploaded from this app: show the file it came from
+  if (props.image.source_path) {
+    return props.image.source_path.split('/').pop().replace(/\.jpe?g$/i, '')
+  }
   // Met images have title
   if (props.image.title) {
     return props.image.title
@@ -160,24 +170,25 @@ const computedAspectRatio = computed(() => {
 .image-card {
   position: relative;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  border: 3px solid transparent;
-  transition: border-color 0.2s, transform 0.2s;
-  background: #2a2a4e;
+  background: var(--surface-3);
+  box-shadow: 0 0 0 1px var(--border);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .image-card:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px var(--border-strong), var(--shadow);
 }
 
 .image-card.selected {
-  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px var(--accent-soft);
 }
 
-.image-card.current {
-  border-color: #44ff44;
+.image-card.current:not(.selected) {
+  box-shadow: 0 0 0 2px var(--success);
 }
 
 .checkbox {
@@ -185,18 +196,35 @@ const computedAspectRatio = computed(() => {
   top: 8px;
   left: 8px;
   z-index: 2;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(10, 11, 15, 0.55);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.image-card:hover .checkbox,
+.image-card.selected .checkbox {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .checkbox { opacity: 1; }
 }
 
 .checkbox input {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
 }
 
 img {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -208,19 +236,20 @@ img.loaded {
   opacity: 1;
 }
 
+.image-card.on-tv:not(.selected) img.loaded {
+  opacity: 0.5;
+}
+
 .placeholder {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  font-weight: bold;
-  color: #666;
-  background: linear-gradient(135deg, #2a2a4e, #1a1a2e);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-faint);
+  background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
 }
 
 .overlay {
@@ -228,27 +257,58 @@ img.loaded {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 8px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  padding: 24px 10px 8px;
+  background: linear-gradient(transparent, rgba(5, 6, 10, 0.85));
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
 }
 
 .name {
+  flex: 1;
+  min-width: 0;
   font-size: 0.75rem;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 70%;
+  color: #f4f5f8;
+}
+
+.on-tv-badge,
+.current-badge,
+.label-chip {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.on-tv-badge {
+  background: var(--accent);
+  color: #fff;
 }
 
 .current-badge {
-  background: #44ff44;
-  color: black;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: bold;
+  background: var(--success);
+  color: #06281c;
+}
+
+.label-chips {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.label-chip {
+  background: rgba(255, 255, 255, 0.14);
+  color: #f4f5f8;
+  backdrop-filter: blur(6px);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

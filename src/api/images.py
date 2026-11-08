@@ -39,6 +39,7 @@ async def list_images(folder: str = Query(None)):
                     "path": str(rel_path),
                     "name": path.name,
                     "size": path.stat().st_size,
+                    "mtime": path.stat().st_mtime,
                     "width": width,
                     "height": height
                 })
@@ -57,6 +58,7 @@ async def list_images(folder: str = Query(None)):
                     "path": str(rel_path),
                     "name": path.name,
                     "size": path.stat().st_size,
+                    "mtime": path.stat().st_mtime,
                     "width": width,
                     "height": height
                 })

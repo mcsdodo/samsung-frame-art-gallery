@@ -44,7 +44,7 @@ const collectionsPanel = ref(null)
 
 const tabs = [
   { id: 'local', label: 'Local Images' },
-  { id: 'met', label: 'Metropolitan Museum of Art' },
+  { id: 'met', label: 'Met Museum' },
   { id: 'collections', label: 'Collections' }
 ]
 
@@ -94,28 +94,43 @@ watch(activeTab, (newTab) => {
 
 .source-tabs {
   display: flex;
-  background: #1a1a2e;
-  border-bottom: 1px solid #2a2a4e;
+  gap: 4px;
+  padding: 8px 12px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .source-tabs button {
-  flex: 1;
-  padding: 0.75rem;
+  position: relative;
+  padding: 10px 14px 12px;
   border: none;
   background: transparent;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
+  font-size: 0.875rem;
+  font-weight: 550;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: color 0.15s, background 0.15s;
 }
 
 .source-tabs button:hover {
-  color: #aaa;
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 .source-tabs button.active {
-  color: white;
-  border-bottom: 2px solid #4a90d9;
+  color: var(--text);
+}
+
+.source-tabs button.active::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* When Collections tab is active, add left padding to align with sidebar */

@@ -13,7 +13,7 @@
         Re-framing
       </label>
     </div>
-    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
+    <div v-show="!(reframeValue && allowReframe)" class="crop-field">
       <label title="Remove edges from all sides before adding matte">Crop:</label>
       <input
         type="number"
@@ -27,7 +27,7 @@
       />
       <span class="unit">%</span>
     </div>
-    <div class="crop-field" :class="{ disabled: reframeValue && allowReframe }">
+    <div v-show="!(reframeValue && allowReframe)" class="crop-field">
       <label title="Add white border around the image">Matte:</label>
       <input
         type="number"
@@ -67,7 +67,7 @@ const props = defineProps({
   }
 })
 
-const reframeValue = ref(false)
+const reframeValue = ref(true)  // fill the frame by default; no white matte
 const cropValue = ref(0)
 const matteValue = ref(10)
 
@@ -100,7 +100,8 @@ onMounted(async () => {
 <style scoped>
 .crop-settings {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   align-items: center;
 }
 
@@ -110,11 +111,12 @@ onMounted(async () => {
 }
 
 .checkbox-label {
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 0.4rem;
   font-size: 0.9rem;
-  color: #ccc;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -131,45 +133,41 @@ onMounted(async () => {
   transition: opacity 0.2s;
 }
 
-.crop-field.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
 .crop-field label {
   font-size: 0.9rem;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .crop-field input[type="number"] {
-  width: 70px;
-  padding: 0.4rem 0.6rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
-  color: white;
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .crop-field input[type="number"]:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent);
 }
 
 .crop-field input[type="number"]:disabled {
-  background: #1a1a2e;
-  color: #666;
+  background: var(--surface-2);
+  color: var(--text-faint);
 }
 
 .crop-field .unit {
   font-size: 0.9rem;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .preview-btn {
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #3a3a5e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-hover);
   color: white;
   cursor: pointer;
   font-size: 0.9rem;
@@ -177,7 +175,7 @@ onMounted(async () => {
 }
 
 .preview-btn:hover:not(:disabled) {
-  background: #4a4a6e;
+  background: var(--surface-hover);
 }
 
 .preview-btn:disabled {

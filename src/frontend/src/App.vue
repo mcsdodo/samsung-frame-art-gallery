@@ -1,11 +1,15 @@
 <template>
   <div class="app">
     <header class="header">
-      <h1>Samsung Frame Art Gallery</h1>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>Frame Art Gallery</h1>
+      </div>
       <div class="header-right">
-        <button class="tv-settings-btn" @click="openTvSettings" :title="tvName || 'TV Settings'">
-          <span class="tv-icon">📺</span>
+        <button class="tv-settings-btn" @click="openTvSettings" :title="tvStatus.connected ? 'TV settings' : 'TV not connected — open settings'">
           <span class="status-dot" :class="{ connected: tvStatus.connected }"></span>
+          <span class="tv-name">{{ tvName || 'Connect TV' }}</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="10" rx="1.5" /><path d="M7 17h6" /></svg>
         </button>
       </div>
     </header>
@@ -52,6 +56,8 @@
       @connected="handleTvConnected"
     />
 
+    <UploadDock />
+
     <!-- Toast Notification -->
     <div v-if="toast.show" class="toast" :class="toast.type">
       {{ toast.message }}
@@ -68,6 +74,7 @@ import SourcePanel from './components/SourcePanel.vue'
 import TVPanel from './views/TVPanel.vue'
 import ImagePreview from './components/ImagePreview.vue'
 import TvConnectionModal from './components/TvConnectionModal.vue'
+import UploadDock from './components/UploadDock.vue'
 
 const tvStatus = ref({ connected: false })
 const isMobile = ref(false)
@@ -120,6 +127,7 @@ const openTvSettings = () => {
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  window.addEventListener('tv-uploads-finished', refreshTV)
 
   try {
     const res = await fetch('/api/tv/settings')
@@ -141,6 +149,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('tv-uploads-finished', refreshTV)
   if (toastTimeout.value) {
     clearTimeout(toastTimeout.value)
   }
@@ -159,58 +168,92 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
-  background: #1a1a2e;
-  color: white;
+  height: 56px;
+  padding: 0 16px 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #8b7bff 0%, #6e5df6 45%, #e0a85a 100%);
+  box-shadow: inset 0 0 0 3px rgba(10, 11, 15, 0.55);
 }
 
 .header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 8px;
 }
 
 .tv-settings-btn {
-  position: relative;
-  background: none;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 550;
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 8px;
-  transition: background 0.2s;
+  transition: background 0.15s;
 }
 
 .tv-settings-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-3);
 }
 
-.tv-icon {
-  font-size: 1.5rem;
+.tv-settings-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.tv-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tv-settings-btn .status-dot {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ff4444;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
 }
 
 .tv-settings-btn .status-dot.connected {
-  background: #44ff44;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
 }
 
 .mobile-tabs {
   display: flex;
-  background: #1a1a2e;
-  border-bottom: 1px solid #2a2a4e;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
 }
 
 .mobile-tabs button {
@@ -218,14 +261,14 @@ onUnmounted(() => {
   padding: 0.75rem;
   border: none;
   background: transparent;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 1rem;
 }
 
 .mobile-tabs button.active {
   color: white;
-  border-bottom: 2px solid #4a90d9;
+  border-bottom: 2px solid var(--accent);
 }
 
 .main {
@@ -258,7 +301,7 @@ onUnmounted(() => {
 
 .divider {
   grid-row: 1 / -1; /* Span all rows */
-  background: #2a2a4e;
+  background: var(--border);
 }
 
 .toast {
@@ -267,9 +310,11 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   padding: 0.75rem 1.5rem;
-  background: #2a2a4e;
-  color: white;
-  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -278,11 +323,11 @@ onUnmounted(() => {
 }
 
 .toast.success {
-  background: #2d5a3d;
+  border-left: 3px solid var(--success);
 }
 
 .toast.error {
-  background: #5a2d2d;
+  border-left: 3px solid var(--danger);
 }
 
 .toast-action {

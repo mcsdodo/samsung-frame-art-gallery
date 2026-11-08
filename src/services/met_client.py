@@ -12,6 +12,10 @@ import json
 _LOGGER = logging.getLogger(__name__)
 
 MET_API_BASE = "https://collectionapi.metmuseum.org/public/collection/v1"
+# v1/search was retired 2026-10-01; v1.1 pages results at most 100 per request.
+MET_SEARCH_BASE = "https://collectionapi.metmuseum.org/public/collection/v1.1"
+MET_SEARCH_PAGE = 100
+MET_SEARCH_MAX_IDS = 500  # 5 search calls per listing; more trips the Met's bot protection
 MET_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 DIMENSIONS_CACHE_DIR = Path(os.environ.get("THUMBNAILS_DIR", "/thumbnails")) / "met_dims"
 
@@ -198,8 +202,16 @@ class MetClient:
         if cached:
             return cached
 
-        data = self._fetch_json(endpoint)
-        object_ids = data.get("objectIDs") or []
+        object_ids = []
+        while len(object_ids) < MET_SEARCH_MAX_IDS:
+            paged = endpoint.replace(
+                "/search?", f"/search?limit={MET_SEARCH_PAGE}&offset={len(object_ids)}&", 1
+            )
+            data = self._fetch_json(paged)
+            batch = data.get("objectIDs") or []
+            object_ids.extend(batch)
+            if len(batch) < MET_SEARCH_PAGE or len(object_ids) >= (data.get("total") or 0):
+                break
         # Cache for 1 hour
         self._set_cached(cache_key, object_ids, self._objects_ttl)
         return object_ids
@@ -208,10 +220,10 @@ class MetClient:
         """Get highlighted artworks with images, paginated."""
         if medium:
             cache_key = f"highlights:{medium}:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
+            url = f"{MET_SEARCH_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
         else:
             cache_key = "highlights:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+            url = f"{MET_SEARCH_BASE}/search?isHighlight=true&hasImages=true&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -238,7 +250,7 @@ class MetClient:
         cache_key = f"medium:{medium}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
+        url = f"{MET_SEARCH_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -262,7 +274,7 @@ class MetClient:
         cache_key = f"department:{department_id}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
+        url = f"{MET_SEARCH_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
         all_ids = self._get_object_ids(url, cache_key)
 
         total = len(all_ids)
@@ -305,7 +317,7 @@ class MetClient:
         params.append(f"q={encoded_query}")
 
         cache_key = ":".join(cache_parts) + ":ids"
-        url = f"{MET_API_BASE}/search?" + "&".join(params)
+        url = f"{MET_SEARCH_BASE}/search?" + "&".join(params)
 
         all_ids = self._get_object_ids(url, cache_key)
 
@@ -330,10 +342,10 @@ class MetClient:
         """Get highlighted artworks with images, paginated (async parallel fetch)."""
         if medium:
             cache_key = f"highlights:{medium}:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
+            url = f"{MET_SEARCH_BASE}/search?isHighlight=true&hasImages=true&medium={medium}&q=*"
         else:
             cache_key = "highlights:ids"
-            url = f"{MET_API_BASE}/search?isHighlight=true&hasImages=true&q=*"
+            url = f"{MET_SEARCH_BASE}/search?isHighlight=true&hasImages=true&q=*"
 
         all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
         total = len(all_ids)
@@ -360,7 +372,7 @@ class MetClient:
         cache_key = f"medium:{medium}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
+        url = f"{MET_SEARCH_BASE}/search?hasImages=true&medium={encoded_medium}{highlight_param}&q=*"
 
         all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
         total = len(all_ids)
@@ -384,7 +396,7 @@ class MetClient:
         cache_key = f"department:{department_id}{highlight_suffix}:ids"
 
         highlight_param = "&isHighlight=true" if highlights_only else ""
-        url = f"{MET_API_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
+        url = f"{MET_SEARCH_BASE}/search?departmentId={department_id}&hasImages=true{highlight_param}&q=*"
 
         all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
         total = len(all_ids)
@@ -423,7 +435,7 @@ class MetClient:
 
         params.append(f"q={encoded_query}")
         cache_key = ":".join(cache_parts) + ":ids"
-        url = f"{MET_API_BASE}/search?" + "&".join(params)
+        url = f"{MET_SEARCH_BASE}/search?" + "&".join(params)
 
         all_ids = await asyncio.to_thread(self._get_object_ids, url, cache_key)
         total = len(all_ids)

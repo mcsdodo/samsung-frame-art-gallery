@@ -14,14 +14,17 @@ A self-hosted web application for managing artwork on Samsung Frame TVs. Browse 
 
 ### TV Integration
 - **Auto TV Discovery** - Automatically finds Samsung Frame TVs on your network via SSDP
-- **Batch Upload** - Upload multiple images to your TV at once
+- **Background Uploads** - Queue any number of images and keep browsing; a docked panel shows per-image progress, failed uploads retry automatically, and a Retry button covers the rest
+- **Upload Tracking** - Local images already on the TV get an "ON TV" badge (and can be hidden), and TV artwork shows the file it came from
+- **Sorting** - Sort local images and TV artwork newest or oldest first (local images also by name)
+- **Labels & Label Slideshows** - Label TV artwork (e.g. "Nature"), filter by label, and run the slideshow on a single label
 - **Art Management** - View, display, and delete artwork on your TV
 - **Live Preview** - See exactly how your images will look before uploading
 
 ### Image Processing
 - **Smart Cropping** - Remove unwanted edges from images (0-50%)
 - **Auto Matte** - Automatically add museum-style matting to fit the 16:9 frame
-- **Re-framing Mode** - Fill the entire frame with adjustable positioning for single images
+- **Re-framing Mode** - Fill the entire frame with adjustable positioning for single images (on by default, so uploads have no white border)
 
 ### User Experience
 - **Responsive Design** - Split-panel desktop layout, tabbed mobile interface
@@ -126,11 +129,11 @@ services:
 
 ### Local Images Tab
 
-1. Browse your image collection using folder navigation
-2. Select one or more images by clicking on them
-3. Adjust crop and matte percentages, or enable "Re-framing" mode
+1. Browse your image collection using folder navigation; sort by newest, oldest or name
+2. Select one or more images by clicking on them. Images already on the TV are marked "ON TV"; tick "Hide on TV" to show only what is left to upload
+3. Re-framing (fill the frame, no border) is on by default; untick it to use crop and matte percentages instead
 4. Click "Preview" to see how images will look on the TV
-5. Click "Upload" or "Upload & Display"
+5. Click "Upload" or "Upload & Display". Uploads run in the background: the panel in the bottom-right corner shows each image, retries failures twice on its own, and offers Retry for anything that still fails
 
 ### Met Museum Tab
 
@@ -141,9 +144,35 @@ services:
 
 ### TV Panel
 
-1. View all artwork currently stored on your TV
-2. Click any artwork to display it
-3. Delete artwork you no longer want
+1. View all artwork currently stored on your TV, newest or oldest first
+2. Artwork uploaded from this app is labelled with its source file name
+3. Click any artwork to display it
+4. Delete artwork you no longer want
+5. Select artwork and click "Label" to add or remove labels; the chips above the grid filter by label
+6. Turn on Slideshow and pick "All artwork" or a label, an interval (2 min to 1 hr) and shuffle
+
+> **How label slideshows work:** the TV has no custom categories, so the app plays a label through the TV's **Favourites** list — it sets Favourites to exactly that label's artwork and runs the slideshow on Favourites. Favourites you set by hand on the TV are replaced while a label is playing.
+
+### Artwork uploaded before upload tracking
+
+Uploads are recorded in `data/uploads.json` from now on. To label artwork that was already on the TV, match it to your local files by thumbnail:
+
+```bash
+docker compose exec app python -m src.backfill_uploads          # show proposed matches
+docker compose exec app python -m src.backfill_uploads --apply  # save them
+```
+
+Only near-identical matches are saved; artwork that did not come from your images folder is left alone.
+
+## Getting 4K Artwork
+
+Two optional scripts in `scripts/` download public-domain artwork from Wikimedia Commons into your images folder (`$IMAGES_DIR`, default `./images`), keeping only images large enough for a 3840x2160 screen and writing a `CREDITS.tsv` with licence and source for each file:
+
+```bash
+python3 scripts/fetch_art.py monet                # search, then pick which to download
+python3 scripts/fetch_art.py "great wave" --all   # download every result
+pip install Pillow && python3 scripts/fetch_framecrop_popular.py   # ~25 popular Frame artworks, cropped to fill 16:9
+```
 
 ## Development
 
@@ -175,6 +204,7 @@ npm run dev
 samsung-frame-art-gallery/
 ├── src/
 │   ├── main.py                 # FastAPI application entry point
+│   ├── backfill_uploads.py     # One-off: link existing TV artwork to local files
 │   ├── api/
 │   │   ├── images.py           # Local image endpoints
 │   │   ├── tv.py               # TV control & upload endpoints
@@ -186,15 +216,20 @@ samsung-frame-art-gallery/
 │   │   ├── met_client.py       # Met Museum API client
 │   │   ├── image_processor.py  # Crop, matte, reframe processing
 │   │   ├── thumbnails.py       # Local image thumbnails
+│   │   ├── upload_registry.py  # Which local file each TV artwork came from
+│   │   ├── labels.py           # Artwork labels and the label the slideshow plays
 │   │   └── preview_cache.py    # Preview generation cache
 │   └── frontend/               # Vue 3 + Vite SPA
 │       ├── src/
+│       │   ├── stores/
+│       │   │   └── uploadQueue.js  # Background upload queue with retry
 │       │   ├── views/
 │       │   │   ├── LocalPanel.vue
 │       │   │   ├── MetPanel.vue
 │       │   │   └── TVPanel.vue
 │       │   └── components/
 │       └── package.json
+├── scripts/                    # Optional 4K public-domain art downloaders
 ├── docker/
 │   └── Dockerfile              # Multi-stage build
 ├── docker-compose.yml
@@ -205,7 +240,7 @@ samsung-frame-art-gallery/
 
 - **Backend:** FastAPI, Python 3.11+, Pillow, httpx
 - **Frontend:** Vue 3.4, Vite 5
-- **TV Communication:** [samsung-tv-ws-api](https://github.com/NickWaterton/samsung-tv-ws-api)
+- **TV Communication:** [samsung-tv-ws-api](https://github.com/NickWaterton/samsung-tv-ws-api) (published on PyPI as `samsungframetv`)
 - **External APIs:** [Met Museum Collection API](https://metmuseum.github.io/)
 - **Infrastructure:** Docker, Docker Compose
 
@@ -240,12 +275,15 @@ samsung-frame-art-gallery/
 | GET | `/api/tv/status` | Get TV connection status |
 | GET | `/api/tv/settings` | Get saved TV selection |
 | POST | `/api/tv/settings` | Save TV selection |
-| GET | `/api/tv/artwork` | List artwork on TV |
+| GET | `/api/tv/artwork` | List artwork on TV (with `source_path` for artwork uploaded from this app) |
 | GET | `/api/tv/artwork/current` | Get currently displayed artwork |
 | POST | `/api/tv/artwork/current` | Display specific artwork |
 | DELETE | `/api/tv/artwork/{id}` | Delete artwork from TV |
 | POST | `/api/tv/preview` | Generate upload preview |
 | POST | `/api/tv/upload` | Upload local images to TV |
+| POST | `/api/tv/labels` | Add/remove labels on artwork (`content_ids`, `add`, `remove`) |
+| GET | `/api/tv/slideshow` | Slideshow status, including the playing `label` |
+| POST | `/api/tv/slideshow` | Set slideshow (`enabled`, `duration` in minutes, `shuffle`, optional `label`) |
 
 ## TV Compatibility
 
