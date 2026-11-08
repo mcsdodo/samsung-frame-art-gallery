@@ -129,9 +129,9 @@ const handleDelete = () => {
   align-items: center;
   width: 100%;
   padding: 0.75rem 1rem;
-  background: #1a1a2e;
+  background: var(--surface-2);
   border: none;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
   color: white;
   cursor: pointer;
 }
@@ -158,7 +158,7 @@ const handleDelete = () => {
 .sheet-content {
   width: 100%;
   max-height: 70vh;
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 16px 16px 0 0;
   padding: 0 1rem 1rem;
   display: flex;
@@ -175,7 +175,7 @@ const handleDelete = () => {
 .handle-bar {
   width: 40px;
   height: 4px;
-  background: #3a3a5e;
+  background: var(--surface-hover);
   border-radius: 2px;
 }
 
@@ -219,7 +219,7 @@ const handleDelete = () => {
   width: 44px;
   height: 44px;
   border-radius: 6px;
-  background: #2a2a4e;
+  background: var(--surface-3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -256,7 +256,7 @@ const handleDelete = () => {
   width: 100%;
   padding: 0.75rem;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   border: none;
   border-radius: 8px;
   font-weight: 600;
@@ -273,7 +273,7 @@ const handleDelete = () => {
 .context-menu {
   position: fixed;
   z-index: 1002;
-  background: #2a2a4e;
+  background: var(--surface-3);
   border-radius: 8px;
   padding: 0.5rem 0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -291,11 +291,11 @@ const handleDelete = () => {
 }
 
 .context-menu button:hover {
-  background: #3a3a5e;
+  background: var(--surface-hover);
 }
 
 .context-menu button.danger {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 /* Transitions */

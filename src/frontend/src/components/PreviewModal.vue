@@ -351,14 +351,14 @@ onUnmounted(() => {
 }
 
 .modal-content {
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 8px;
   max-width: 1400px;
   max-height: 90vh;
   width: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid #2a2a4e;
+  border: 1px solid var(--border);
 }
 
 .modal-header {
@@ -366,7 +366,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
@@ -378,7 +378,7 @@ onUnmounted(() => {
 .close-btn {
   background: transparent;
   border: none;
-  color: #aaa;
+  color: var(--text-muted);
   font-size: 2rem;
   cursor: pointer;
   padding: 0;
@@ -401,14 +401,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 3rem;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #2a2a4e;
-  border-top-color: #4a90d9;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -445,8 +445,8 @@ onUnmounted(() => {
 }
 
 .image-box {
-  background: #12121f;
-  border: 1px solid #2a2a4e;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.75rem;
 }
@@ -454,7 +454,7 @@ onUnmounted(() => {
 .image-box h4 {
   margin: 0 0 0.5rem 0;
   font-size: 0.9rem;
-  color: #aaa;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -470,7 +470,7 @@ onUnmounted(() => {
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #2a2a4e;
+  border-top: 1px solid var(--border);
 }
 
 .modal-footer button {
@@ -488,12 +488,12 @@ onUnmounted(() => {
 }
 
 .modal-footer button.primary {
-  background: #4a90d9;
+  background: var(--accent);
   color: white;
 }
 
 .modal-footer button.secondary {
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
 }
 
@@ -510,11 +510,11 @@ onUnmounted(() => {
 
 /* Reframe mode styles */
 .info-banner {
-  background: #2a3a5e;
-  color: #8ab4f8;
+  background: var(--accent-soft);
+  color: var(--accent-text);
   padding: 0.75rem 1.5rem;
   font-size: 0.9rem;
-  border-bottom: 1px solid #3a4a6e;
+  border-bottom: 1px solid var(--accent-soft);
 }
 
 .reframe-container {
@@ -527,7 +527,7 @@ onUnmounted(() => {
 }
 
 .reframe-instructions {
-  color: #aaa;
+  color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -539,7 +539,7 @@ onUnmounted(() => {
   max-width: 100%;
   cursor: grab;
   border-radius: 4px;
-  background: #1a1a2e;
+  background: var(--surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -568,7 +568,7 @@ onUnmounted(() => {
   position: absolute;
   /* Transparent window showing the crop area */
   background: transparent;
-  border: 2px solid #4a90d9;
+  border: 2px solid var(--accent);
   border-radius: 2px;
   box-shadow:
     0 0 0 9999px rgba(0, 0, 0, 0.6),

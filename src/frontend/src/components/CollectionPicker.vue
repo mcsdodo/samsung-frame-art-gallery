@@ -210,7 +210,7 @@ onMounted(loadCollections)
 }
 
 .collection-picker {
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 12px;
   width: 90%;
   max-width: 420px;
@@ -226,7 +226,7 @@ onMounted(loadCollections)
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
 }
 
 .picker-header h3 {
@@ -237,7 +237,7 @@ onMounted(loadCollections)
 .close-btn {
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
@@ -251,8 +251,8 @@ onMounted(loadCollections)
 /* Items preview */
 .items-preview {
   padding: 1rem 1.25rem;
-  background: #12121f;
-  border-bottom: 1px solid #2a2a4e;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -268,7 +268,7 @@ onMounted(loadCollections)
   height: 40px;
   border-radius: 4px;
   overflow: hidden;
-  background: #2a2a4e;
+  background: var(--surface-3);
 }
 
 .preview-thumb img {
@@ -281,7 +281,7 @@ onMounted(loadCollections)
   width: 40px;
   height: 40px;
   border-radius: 4px;
-  background: #3a3a5e;
+  background: var(--surface-hover);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -310,8 +310,8 @@ onMounted(loadCollections)
   flex: 1;
   padding: 0.6rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
   color: white;
 }
 
@@ -325,7 +325,7 @@ onMounted(loadCollections)
   border-radius: 6px;
   border: none;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   font-weight: 600;
   cursor: pointer;
 }
@@ -337,7 +337,7 @@ onMounted(loadCollections)
 
 .loading, .empty {
   text-align: center;
-  color: #888;
+  color: var(--text-muted);
   padding: 2rem;
 }
 
@@ -384,7 +384,7 @@ onMounted(loadCollections)
   width: 44px;
   height: 44px;
   border-radius: 6px;
-  background: #2a2a4e;
+  background: var(--surface-3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -416,7 +416,7 @@ onMounted(loadCollections)
 .success-overlay {
   position: absolute;
   inset: 0;
-  background: #1a1a2e;
+  background: var(--surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -433,7 +433,7 @@ onMounted(loadCollections)
   height: 64px;
   border-radius: 50%;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   font-size: 2rem;
   display: flex;
   align-items: center;
@@ -466,11 +466,11 @@ onMounted(loadCollections)
 
 .success-actions .primary {
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
 }
 
 .success-actions .secondary {
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
 }
 

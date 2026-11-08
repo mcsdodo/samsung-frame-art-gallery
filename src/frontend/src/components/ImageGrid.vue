@@ -15,7 +15,7 @@
           class="deselect-btn"
           @click="$emit('select-all', false)"
         >
-          Deselect All
+          Clear
         </button>
       </div>
       <slot name="header-actions"></slot>
@@ -161,49 +161,65 @@ onUnmounted(() => {
   flex-direction: column;
   min-height: 0; /* Allow flex child to shrink below content size */
   overflow: hidden;
-  background: #12121f;
+  background: var(--bg);
 }
 
 .grid-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  background: #1a1a2e;
-  border-bottom: 1px solid #2a2a4e;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.grid-header > :deep(.chip-row) {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-left: auto;
+  min-width: 0;
+  scrollbar-width: none;
 }
 
 .select-controls {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 12px;
+  flex: none;
 }
 
 .select-all {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
   cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .select-all input {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .deselect-btn {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
   background: transparent;
-  color: #aaa;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .deselect-btn:hover {
-  background: #2a2a4e;
-  color: white;
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .grid-container {
@@ -225,15 +241,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #888;
+  color: var(--text-muted);
   padding: 1rem;
 }
 
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #333;
-  border-top-color: #4a90d9;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -249,6 +265,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #888;
+  color: var(--text-muted);
 }
 </style>

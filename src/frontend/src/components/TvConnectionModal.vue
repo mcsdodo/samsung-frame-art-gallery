@@ -192,7 +192,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 12px;
   width: 90%;
   max-width: 450px;
@@ -207,7 +207,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
@@ -219,7 +219,7 @@ onMounted(() => {
 .close-btn {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
@@ -238,14 +238,14 @@ onMounted(() => {
 .scanning {
   text-align: center;
   padding: 2rem 0;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #2a2a4e;
-  border-top-color: #4a90d9;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
@@ -273,18 +273,18 @@ onMounted(() => {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: #2a2a4e;
+  background: var(--surface-3);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .tv-card:hover {
-  background: #3a3a5e;
+  background: var(--surface-hover);
 }
 
 .tv-card.selected {
-  background: #4a90d9;
+  background: var(--accent);
 }
 
 .tv-card.connecting {
@@ -306,7 +306,7 @@ onMounted(() => {
 }
 
 .tv-ip {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -318,15 +318,15 @@ onMounted(() => {
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
-  border: 1px solid #4a90d9;
-  color: #4a90d9;
+  border: 1px solid var(--accent);
+  color: var(--accent);
   border-radius: 6px;
   cursor: pointer;
   align-self: center;
 }
 
 .rescan-btn:hover:not(:disabled) {
-  background: rgba(74, 144, 217, 0.1);
+  background: var(--accent-soft);
 }
 
 .rescan-btn:disabled {
@@ -337,7 +337,7 @@ onMounted(() => {
 .no-tvs {
   text-align: center;
   padding: 2rem 0;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .manual-entry {
@@ -348,7 +348,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
-  color: #666;
+  color: var(--text-faint);
   font-size: 0.85rem;
   margin-bottom: 1rem;
 }
@@ -358,7 +358,7 @@ onMounted(() => {
   content: '';
   flex: 1;
   height: 1px;
-  background: #2a2a4e;
+  background: var(--surface-3);
 }
 
 .manual-form {
@@ -369,8 +369,8 @@ onMounted(() => {
 .manual-form input {
   flex: 1;
   padding: 0.75rem 1rem;
-  background: #2a2a4e;
-  border: 1px solid #3a3a5e;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   color: white;
   font-size: 1rem;
@@ -378,12 +378,12 @@ onMounted(() => {
 
 .manual-form input:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent);
 }
 
 .manual-form button {
   padding: 0.75rem 1.5rem;
-  background: #4a90d9;
+  background: var(--accent);
   border: none;
   border-radius: 6px;
   color: white;
@@ -392,7 +392,7 @@ onMounted(() => {
 }
 
 .manual-form button:hover:not(:disabled) {
-  background: #5a9fe9;
+  background: var(--accent-hover);
 }
 
 .manual-form button:disabled {
@@ -403,10 +403,10 @@ onMounted(() => {
 .error {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 68, 68, 0.1);
-  border: 1px solid rgba(255, 68, 68, 0.3);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-soft);
   border-radius: 6px;
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 0.9rem;
 }
 </style>

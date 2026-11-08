@@ -59,7 +59,7 @@ p {
 .cta-btn {
   padding: 0.75rem 1.5rem;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   border: none;
   border-radius: 8px;
   font-weight: 600;

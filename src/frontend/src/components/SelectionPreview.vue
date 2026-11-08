@@ -40,7 +40,7 @@ const overflowCount = computed(() => Math.max(0, props.images.length - MAX_DISPL
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: #1e1e32;
+  background: var(--surface-2);
   border-radius: 8px;
   min-width: 200px;
 }
@@ -62,7 +62,7 @@ const overflowCount = computed(() => Math.max(0, props.images.length - MAX_DISPL
   height: 36px;
   border-radius: 4px;
   overflow: hidden;
-  background: #2a2a4e;
+  background: var(--surface-3);
 }
 
 .preview-thumb img {
@@ -75,7 +75,7 @@ const overflowCount = computed(() => Math.max(0, props.images.length - MAX_DISPL
   width: 36px;
   height: 36px;
   border-radius: 4px;
-  background: #3a3a5e;
+  background: var(--surface-hover);
   display: flex;
   align-items: center;
   justify-content: center;

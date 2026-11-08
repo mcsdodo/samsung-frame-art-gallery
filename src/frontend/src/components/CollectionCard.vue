@@ -67,7 +67,7 @@ defineEmits(['select'])
   height: 40px;
   border-radius: 4px;
   overflow: hidden;
-  background: #2a2a4e;
+  background: var(--surface-3);
   flex-shrink: 0;
   display: flex;
   align-items: center;

@@ -43,14 +43,14 @@ defineEmits(['select', 'create'])
   min-width: 200px;
   display: flex;
   flex-direction: column;
-  background: #12121f;
-  border-right: 1px solid #2a2a4e;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   overflow: hidden;
 }
 
 .sidebar-header {
   padding: 1rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-title {
@@ -65,7 +65,7 @@ defineEmits(['select', 'create'])
   margin: 0.75rem;
   padding: 0.6rem 1rem;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   border: none;
   border-radius: 6px;
   font-weight: 600;

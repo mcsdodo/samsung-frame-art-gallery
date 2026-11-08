@@ -50,7 +50,7 @@ p {
 
 .cta-btn {
   padding: 0.6rem 1.25rem;
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
   border: none;
   border-radius: 6px;
@@ -60,6 +60,6 @@ p {
 }
 
 .cta-btn:hover {
-  background: #4a4a6e;
+  background: var(--surface-hover);
 }
 </style>
