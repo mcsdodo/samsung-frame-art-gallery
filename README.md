@@ -14,9 +14,10 @@ A self-hosted web application for managing artwork on Samsung Frame TVs. Browse 
 
 ### TV Integration
 - **Auto TV Discovery** - Automatically finds Samsung Frame TVs on your network via SSDP
-- **Batch Upload** - Upload multiple images to your TV at once, with a per-image progress window and a Stop button
+- **Background Uploads** - Queue any number of images and keep browsing; a docked panel shows per-image progress, failed uploads retry automatically, and a Retry button covers the rest
 - **Upload Tracking** - Local images already on the TV get an "ON TV" badge (and can be hidden), and TV artwork shows the file it came from
 - **Sorting** - Sort local images and TV artwork newest or oldest first (local images also by name)
+- **Labels & Label Slideshows** - Label TV artwork (e.g. "Nature"), filter by label, and run the slideshow on a single label
 - **Art Management** - View, display, and delete artwork on your TV
 - **Live Preview** - See exactly how your images will look before uploading
 
@@ -132,7 +133,7 @@ services:
 2. Select one or more images by clicking on them. Images already on the TV are marked "ON TV"; tick "Hide on TV" to show only what is left to upload
 3. Re-framing (fill the frame, no border) is on by default; untick it to use crop and matte percentages instead
 4. Click "Preview" to see how images will look on the TV
-5. Click "Upload" or "Upload & Display". A progress window shows each image; anything that fails or is stopped stays selected so you can retry
+5. Click "Upload" or "Upload & Display". Uploads run in the background: the panel in the bottom-right corner shows each image, retries failures twice on its own, and offers Retry for anything that still fails
 
 ### Met Museum Tab
 
@@ -147,6 +148,10 @@ services:
 2. Artwork uploaded from this app is labelled with its source file name
 3. Click any artwork to display it
 4. Delete artwork you no longer want
+5. Select artwork and click "Label" to add or remove labels; the chips above the grid filter by label
+6. Turn on Slideshow and pick "All artwork" or a label, an interval (2 min to 1 hr) and shuffle
+
+> **How label slideshows work:** the TV has no custom categories, so the app plays a label through the TV's **Favourites** list — it sets Favourites to exactly that label's artwork and runs the slideshow on Favourites. Favourites you set by hand on the TV are replaced while a label is playing.
 
 ### Artwork uploaded before upload tracking
 
@@ -212,9 +217,12 @@ samsung-frame-art-gallery/
 │   │   ├── image_processor.py  # Crop, matte, reframe processing
 │   │   ├── thumbnails.py       # Local image thumbnails
 │   │   ├── upload_registry.py  # Which local file each TV artwork came from
+│   │   ├── labels.py           # Artwork labels and the label the slideshow plays
 │   │   └── preview_cache.py    # Preview generation cache
 │   └── frontend/               # Vue 3 + Vite SPA
 │       ├── src/
+│       │   ├── stores/
+│       │   │   └── uploadQueue.js  # Background upload queue with retry
 │       │   ├── views/
 │       │   │   ├── LocalPanel.vue
 │       │   │   ├── MetPanel.vue
@@ -273,6 +281,9 @@ samsung-frame-art-gallery/
 | DELETE | `/api/tv/artwork/{id}` | Delete artwork from TV |
 | POST | `/api/tv/preview` | Generate upload preview |
 | POST | `/api/tv/upload` | Upload local images to TV |
+| POST | `/api/tv/labels` | Add/remove labels on artwork (`content_ids`, `add`, `remove`) |
+| GET | `/api/tv/slideshow` | Slideshow status, including the playing `label` |
+| POST | `/api/tv/slideshow` | Set slideshow (`enabled`, `duration` in minutes, `shuffle`, optional `label`) |
 
 ## TV Compatibility
 
