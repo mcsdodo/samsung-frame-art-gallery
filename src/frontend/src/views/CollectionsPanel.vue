@@ -81,14 +81,14 @@
                   <div class="upload-buttons">
                     <button
                       class="secondary"
-                      :disabled="selectedIds.size === 0 || uploading"
+                      :disabled="selectedIds.size === 0"
                       @click="upload(false)"
                     >
                       Upload to TV
                     </button>
                     <button
                       class="primary"
-                      :disabled="selectedIds.size === 0 || uploading"
+                      :disabled="selectedIds.size === 0"
                       @click="upload(true)"
                     >
                       Upload & Display
@@ -145,7 +145,7 @@
           <button class="settings-btn" @click="showMobileSettings = true">⚙️</button>
           <button
             class="primary"
-            :disabled="selectedIds.size === 0 || uploading"
+            :disabled="selectedIds.size === 0"
             @click="upload(true)"
           >
             Upload & Display
@@ -175,7 +175,7 @@
               </button>
               <button
                 class="secondary"
-                :disabled="selectedIds.size === 0 || uploading"
+                :disabled="selectedIds.size === 0"
                 @click="upload(false); showMobileSettings = false"
               >
                 Upload to TV
@@ -226,6 +226,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
+import { enqueue } from '../stores/uploadQueue.js'
 import CropSettings from '../components/CropSettings.vue'
 import CollectionsSidebar from '../components/CollectionsSidebar.vue'
 import SelectionPreview from '../components/SelectionPreview.vue'
@@ -258,7 +259,6 @@ const selectedCollection = computed(() =>
 const items = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
-const uploading = ref(false)
 const unavailableCount = ref(0)
 
 const cropPercent = ref(0)
@@ -451,49 +451,15 @@ const removeSelected = async () => {
   }
 }
 
-const upload = async (display) => {
+const upload = (display) => {
   if (selectedIds.value.size === 0) return
-
-  uploading.value = true
-
+  const common = { crop_percent: cropPercent.value, matte_percent: mattePercent.value }
   const selected = items.value.filter(i => selectedIds.value.has(i._id))
-  const localPaths = selected.filter(i => i.type === 'local').map(i => i.path)
-  const metIds = selected.filter(i => i.type === 'met').map(i => i.object_id)
-
-  try {
-    if (localPaths.length > 0) {
-      await fetch('/api/tv/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paths: localPaths,
-          crop_percent: cropPercent.value,
-          matte_percent: mattePercent.value,
-          display: display && metIds.length === 0
-        })
-      })
-    }
-
-    if (metIds.length > 0) {
-      await fetch('/api/met/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          object_ids: metIds,
-          crop_percent: cropPercent.value,
-          matte_percent: mattePercent.value,
-          display
-        })
-      })
-    }
-
-    selectedIds.value = new Set()
-    emit('uploaded')
-  } catch (e) {
-    console.error('Upload failed:', e)
-  } finally {
-    uploading.value = false
-  }
+  enqueue(selected.map(i => i.type === 'local'
+    ? { name: i.path.split('/').pop(), thumb: i.thumbnail, endpoint: '/api/tv/upload', body: { paths: [i.path], ...common } }
+    : { name: i.title || `Met #${i.object_id}`, thumb: i.thumbnail, endpoint: '/api/met/upload', body: { object_ids: [i.object_id], ...common } }
+  ), { display })
+  selectedIds.value = new Set()
 }
 
 watch(showRenameModal, (show) => {
@@ -532,8 +498,8 @@ defineExpose({ loadCollections })
   justify-content: space-between;
   align-items: flex-start;
   padding: 1rem 1.5rem;
-  background: #12121f;
-  border-bottom: 1px solid #2a2a4e;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-info h2 {
@@ -569,11 +535,11 @@ defineExpose({ loadCollections })
 }
 
 .header-actions .icon-btn:hover {
-  background: #2a2a4e;
+  background: var(--surface-3);
 }
 
 .header-actions .icon-btn.danger:hover {
-  background: #4a2a2e;
+  background: var(--danger-soft);
 }
 
 /* Action bar styling for collections */
@@ -593,17 +559,17 @@ defineExpose({ loadCollections })
 .remove-btn {
   padding: 0.4rem 0.75rem;
   background: transparent;
-  border: 1px solid #4a3a3e;
+  border: 1px solid var(--danger-soft);
   border-radius: 4px;
-  color: #ff9999;
+  color: var(--danger-text);
   cursor: pointer;
   font-size: 0.85rem;
   transition: all 0.2s;
 }
 
 .remove-btn:hover:not(:disabled) {
-  background: #4a2a2e;
-  border-color: #6a4a4e;
+  background: var(--danger-soft);
+  border-color: var(--danger-soft);
 }
 
 .remove-btn:disabled {
@@ -628,8 +594,8 @@ defineExpose({ loadCollections })
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #2a2a4e;
-  background: #12121f;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -643,8 +609,8 @@ defineExpose({ loadCollections })
 .collection-select select {
   padding: 0.4rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
   color: white;
   min-width: 200px;
 }
@@ -652,8 +618,8 @@ defineExpose({ loadCollections })
 .new-btn {
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #4a90d9;
+  border: 1px solid var(--border-strong);
+  background: var(--accent);
   color: white;
   cursor: pointer;
   font-size: 1rem;
@@ -668,23 +634,23 @@ defineExpose({ loadCollections })
 .icon-btn {
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
-  color: #ccc;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 0.85rem;
 }
 
 .icon-btn:hover {
-  background: #3a3a5e;
+  background: var(--surface-hover);
 }
 
 .icon-btn.danger {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .icon-btn.danger:hover {
-  background: #4a2a2e;
+  background: var(--danger-soft);
 }
 
 .empty-state {
@@ -693,7 +659,7 @@ defineExpose({ loadCollections })
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  color: #888;
+  color: var(--text-muted);
   gap: 1rem;
 }
 
@@ -701,15 +667,15 @@ defineExpose({ loadCollections })
   padding: 0.75rem 1.5rem;
   border-radius: 4px;
   border: none;
-  background: #4a90d9;
+  background: var(--accent);
   color: white;
   cursor: pointer;
 }
 
 .unavailable-notice {
   padding: 0.5rem 1rem;
-  background: #3a2a2e;
-  color: #ff9999;
+  background: var(--danger-soft);
+  color: var(--danger-text);
   font-size: 0.85rem;
   text-align: center;
 }
@@ -726,7 +692,7 @@ defineExpose({ loadCollections })
 }
 
 .modal {
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 1.5rem;
   width: 90%;
@@ -741,8 +707,8 @@ defineExpose({ loadCollections })
   width: 100%;
   padding: 0.75rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
   color: white;
   margin-bottom: 1rem;
   box-sizing: border-box;
@@ -750,7 +716,7 @@ defineExpose({ loadCollections })
 
 .modal input:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent);
 }
 
 .modal-actions {
@@ -767,12 +733,12 @@ defineExpose({ loadCollections })
 }
 
 .modal-actions button.primary {
-  background: #4a90d9;
+  background: var(--accent);
   color: white;
 }
 
 .modal-actions button.secondary {
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
 }
 
@@ -787,8 +753,8 @@ defineExpose({ loadCollections })
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: #1a1a2e;
-  border-top: 1px solid #2a2a4e;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
 }
 
 .selected-count {
@@ -799,7 +765,7 @@ defineExpose({ loadCollections })
 
 .settings-btn {
   padding: 0.5rem;
-  background: #2a2a4e;
+  background: var(--surface-3);
   border: none;
   border-radius: 6px;
   font-size: 1.25rem;
@@ -809,7 +775,7 @@ defineExpose({ loadCollections })
 .mobile-footer .primary {
   padding: 0.6rem 1rem;
   background: var(--collection-accent);
-  color: #1a1a2e;
+  color: var(--surface-2);
   border: none;
   border-radius: 6px;
   font-weight: 600;
@@ -833,7 +799,7 @@ defineExpose({ loadCollections })
 
 .settings-sheet {
   width: 100%;
-  background: #1a1a2e;
+  background: var(--surface-2);
   border-radius: 16px 16px 0 0;
   padding: 0 1rem 1.5rem;
 }
@@ -848,7 +814,7 @@ defineExpose({ loadCollections })
 .settings-handle .handle-bar {
   width: 40px;
   height: 4px;
-  background: #3a3a5e;
+  background: var(--surface-hover);
   border-radius: 2px;
 }
 
@@ -869,12 +835,12 @@ defineExpose({ loadCollections })
 }
 
 .settings-actions .danger {
-  background: #4a2a2e;
-  color: #ff9999;
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .settings-actions .secondary {
-  background: #3a3a5e;
+  background: var(--surface-hover);
   color: white;
 }
 </style>

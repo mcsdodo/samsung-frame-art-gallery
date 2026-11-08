@@ -3,10 +3,11 @@
     <div class="panel-header">
       <div class="folder-select">
         <button
+          class="chip"
           :class="{ active: !currentFolder }"
           @click="currentFolder = null"
         >All</button>
-        <select v-if="folders.length" v-model="currentFolder">
+        <select v-if="folders.length" v-model="currentFolder" class="select">
           <option :value="null">All Folders</option>
           <option v-for="f in folders" :key="f" :value="f">{{ f }}</option>
         </select>
@@ -16,7 +17,7 @@
           <input type="checkbox" v-model="hideOnTv" />
           <span>Hide on TV ({{ onTvCount }})</span>
         </label>
-        <select v-model="sortOrder" class="sort-select" title="Sort">
+        <select v-model="sortOrder" class="select" title="Sort">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="name">Name</option>
@@ -52,14 +53,14 @@
       </button>
       <button
         class="secondary"
-        :disabled="selectedIds.size === 0 || uploading"
+        :disabled="selectedIds.size === 0"
         @click="upload(false)"
       >
         Upload ({{ selectedIds.size }})
       </button>
       <button
         class="primary"
-        :disabled="selectedIds.size === 0 || uploading"
+        :disabled="selectedIds.size === 0"
         @click="upload(true)"
       >
         Upload & Display
@@ -79,14 +80,6 @@
       @offset-change="fetchPreviewWithOffset"
     />
 
-    <UploadProgress
-      v-if="uploadItems.length"
-      :items="uploadItems"
-      :stopping="stopRequested"
-      @stop="stopRequested = true"
-      @close="uploadItems = []"
-    />
-
     <CollectionPicker
       v-if="showCollectionPicker"
       :items="selectedItemsForCollection"
@@ -103,7 +96,7 @@ import ActionBar from '../components/ActionBar.vue'
 import CropSettings from '../components/CropSettings.vue'
 import PreviewModal from '../components/PreviewModal.vue'
 import CollectionPicker from '../components/CollectionPicker.vue'
-import UploadProgress from '../components/UploadProgress.vue'
+import { enqueue } from '../stores/uploadQueue.js'
 
 const emit = defineEmits(['uploaded', 'preview'])
 
@@ -112,7 +105,6 @@ const folders = ref([])
 const currentFolder = ref(null)
 const selectedIds = ref(new Set())
 const loading = ref(false)
-const uploading = ref(false)
 const cropPercent = ref(0)
 const mattePercent = ref(10)
 const showPreview = ref(false)
@@ -121,8 +113,6 @@ const previews = ref([])
 const reframeEnabled = ref(false)
 const reframeOffsets = ref({})  // path -> {x, y}
 const showCollectionPicker = ref(false)
-const uploadItems = ref([])  // drives the progress overlay; empty = hidden
-const stopRequested = ref(false)
 const onTvPaths = ref(new Set())
 
 const readPref = (key, fallback) => {
@@ -274,61 +264,31 @@ const fetchPreviewWithOffset = async (path, offsetX, offsetY) => {
   }
 }
 
-const uploadFromPreview = async () => {
+const uploadFromPreview = () => {
   showPreview.value = false
-  await upload(false)
+  upload(false)
 }
 
-// One request per image so the overlay can show real progress; the TV takes uploads one at a time anyway.
-const upload = async (display) => {
+// Uploads run in the background queue (see stores/uploadQueue.js); the dock shows progress.
+const upload = (display) => {
   if (selectedIds.value.size === 0) return
-
   const names = new Map(images.value.map(i => [i.path, i.name]))
   // In on-screen order; selected images hidden by a filter still go, at the end
   const order = new Map(sortedImages.value.map((i, k) => [i.path, k]))
   const paths = [...selectedIds.value].sort((a, b) => (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity))
-  uploadItems.value = paths.map(path => ({ path, name: names.get(path) || path, status: 'pending', error: '' }))
-  stopRequested.value = false
-  uploading.value = true
-
-  try {
-    for (const [index, item] of uploadItems.value.entries()) {
-      if (stopRequested.value) {
-        item.status = 'skipped'
-        continue
-      }
-      item.status = 'uploading'
-      try {
-        const res = await fetch('/api/tv/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paths: [item.path],
-            crop_percent: cropPercent.value,
-            matte_percent: mattePercent.value,
-            display: display && index === uploadItems.value.length - 1,
-            reframe_enabled: reframeEnabled.value,
-            reframe_offsets: reframeOffsets.value[item.path] ? { [item.path]: reframeOffsets.value[item.path] } : {}
-          })
-        })
-        const data = await res.json().catch(() => ({}))
-        const result = data.results?.[0]
-        if (res.ok && result?.success) {
-          item.status = 'done'
-        } else {
-          item.status = 'failed'
-          item.error = result?.error || data.detail || `HTTP ${res.status}`
-        }
-      } catch (e) {
-        item.status = 'failed'
-        item.error = e.message || 'Network error'
-      }
+  enqueue(paths.map(path => ({
+    name: names.get(path) || path,
+    thumb: `/api/images/${encodeURIComponent(path)}/thumbnail?size=120`,
+    endpoint: '/api/tv/upload',
+    body: {
+      paths: [path],
+      crop_percent: cropPercent.value,
+      matte_percent: mattePercent.value,
+      reframe_enabled: reframeEnabled.value,
+      reframe_offsets: reframeOffsets.value[path] ? { [path]: reframeOffsets.value[path] } : {}
     }
-    selectedIds.value = new Set(uploadItems.value.filter(i => i.status !== 'done').map(i => i.path))
-    emit('uploaded')
-  } finally {
-    uploading.value = false
-  }
+  })), { display })
+  selectedIds.value = new Set()
 }
 
 const onAddedToCollection = (collection) => {
@@ -357,58 +317,17 @@ onUnmounted(() => window.removeEventListener('tv-artwork-loaded', onTvArtwork))
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid #2a2a4e;
-  background: #12121f;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
-.panel-header h2 {
-  font-size: 1.1rem;
-  margin: 0;
-}
-
-.folder-select {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.folder-select button {
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: transparent;
-  color: #aaa;
-  cursor: pointer;
-}
-
-.folder-select button.active {
-  background: #4a90d9;
-  color: white;
-  border-color: #4a90d9;
-}
-
+.folder-select,
 .sort-controls {
   display: flex;
-  gap: 0.75rem;
+  gap: 10px;
   align-items: center;
-  font-size: 0.85rem;
-  color: #ccc;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-}
-
-.sort-select,
-.folder-select select {
-  padding: 0.4rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
-  color: white;
 }
 </style>

@@ -81,14 +81,14 @@
       </button>
       <button
         class="secondary"
-        :disabled="selectedIds.size === 0 || uploading"
+        :disabled="selectedIds.size === 0"
         @click="upload(false)"
       >
         Upload ({{ selectedIds.size }})
       </button>
       <button
         class="primary"
-        :disabled="selectedIds.size === 0 || uploading"
+        :disabled="selectedIds.size === 0"
         @click="upload(true)"
       >
         Upload & Display
@@ -125,6 +125,7 @@
 import { ref, onMounted, computed } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
+import { enqueue } from '../stores/uploadQueue.js'
 import CropSettings from '../components/CropSettings.vue'
 import PreviewModal from '../components/PreviewModal.vue'
 import ResolutionWarning from '../components/ResolutionWarning.vue'
@@ -153,7 +154,6 @@ const artwork = ref([])
 const selectedIds = ref(new Set())
 const loading = ref(false)
 const loadingMore = ref(false)
-const uploading = ref(false)
 const cropPercent = ref(0)
 const mattePercent = ref(10)
 const showPreview = ref(false)
@@ -468,28 +468,15 @@ const confirmUpload = async () => {
   await doUpload(pendingUpload.value.display)
 }
 
-const doUpload = async (display) => {
-  uploading.value = true
-  try {
-    const res = await fetch('/api/met/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        object_ids: Array.from(selectedIds.value),
-        crop_percent: cropPercent.value,
-        matte_percent: mattePercent.value,
-        display
-      })
-    })
-    const data = await res.json()
-    console.log('Upload results:', data)
-    selectedIds.value = new Set()
-    emit('uploaded')
-  } catch (e) {
-    console.error('Upload failed:', e)
-  } finally {
-    uploading.value = false
-  }
+const doUpload = (display) => {
+  const byId = new Map(artwork.value.map(a => [a.object_id, a]))
+  enqueue(Array.from(selectedIds.value).map(id => ({
+    name: byId.get(id)?.title || `Met #${id}`,
+    thumb: byId.get(id)?.thumbnail,
+    endpoint: '/api/met/upload',
+    body: { object_ids: [id], crop_percent: cropPercent.value, matte_percent: mattePercent.value }
+  })), { display })
+  selectedIds.value = new Set()
 }
 
 const onAddedToCollection = (collection) => {
@@ -514,10 +501,10 @@ defineExpose({ loadMore, hasMore })
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #2a2a4e;
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   gap: 0.5rem;
-  background: #12121f;
+  background: var(--surface);
 }
 
 .panel-header h2 {
@@ -541,20 +528,20 @@ defineExpose({ loadMore, hasMore })
 .search-box input {
   padding: 0.4rem 1.8rem 0.4rem 0.6rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
   color: white;
   width: 180px;
   font-size: 0.9rem;
 }
 
 .search-box input::placeholder {
-  color: #666;
+  color: var(--text-faint);
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent);
 }
 
 .clear-search {
@@ -562,7 +549,7 @@ defineExpose({ loadMore, hasMore })
   right: 4px;
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 4px;
@@ -576,8 +563,8 @@ defineExpose({ loadMore, hasMore })
 .header-controls select {
   padding: 0.4rem;
   border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
   color: white;
 }
 
@@ -588,7 +575,7 @@ defineExpose({ loadMore, hasMore })
   cursor: pointer;
   white-space: nowrap;
   font-size: 0.9rem;
-  color: #ccc;
+  color: var(--text-muted);
 }
 
 .highlights-filter input {
