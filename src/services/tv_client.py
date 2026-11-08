@@ -197,6 +197,19 @@ class TVClient:
         """Clear all cached thumbnails."""
         self._thumbnail_cache.clear()
 
+    def get_favourite_ids(self) -> set:
+        tv = self._get_tv()
+        return {a["content_id"] for a in (tv.art().available("MY-C0004") or []) if a.get("content_id")}
+
+    def sync_favourites(self, wanted: set) -> None:
+        """Make the TV's Favourites exactly `wanted` (how a label slideshow is played)."""
+        tv = self._get_tv()
+        current = self.get_favourite_ids()
+        for content_id in current - wanted:
+            tv.art().set_favourite(content_id, "off")
+        for content_id in wanted - current:
+            tv.art().set_favourite(content_id, "on")
+
     def get_slideshow_status(self) -> dict:
         """Get current slideshow status."""
         try:
@@ -206,13 +219,14 @@ class TVClient:
             _LOGGER.warning(f"Failed to get slideshow status: {e}")
             return {"error": str(e)}
 
-    def set_slideshow_status(self, enabled: bool, duration: int = 15, shuffle: bool = True) -> dict:
+    def set_slideshow_status(self, enabled: bool, duration: int = 15, shuffle: bool = True, category: int = 2) -> dict:
         """Set slideshow status.
 
         Args:
             enabled: Whether slideshow is enabled
             duration: Minutes between image changes (0 to disable)
             shuffle: Random order (True) or sequential (False)
+            category: 2 = My Pictures, 4 = Favourites
         """
         try:
             tv = self._get_tv()
@@ -223,7 +237,7 @@ class TVClient:
                 return tv.art().set_slideshow_status(
                     duration=duration,
                     type=shuffle,
-                    category=2  # MY-C0002 = My Collection
+                    category=category
                 )
         except Exception as e:
             _LOGGER.error(f"Failed to set slideshow status: {e}")

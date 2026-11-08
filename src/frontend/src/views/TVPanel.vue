@@ -21,12 +21,12 @@
             <span>Slideshow</span>
           </label>
           <template v-if="slideshowEnabled">
-            <select v-model.number="slideshowDuration" @change="updateSlideshow" :disabled="slideshowLoading" class="duration-select">
-              <option :value="5">5 min</option>
-              <option :value="10">10 min</option>
-              <option :value="15">15 min</option>
-              <option :value="30">30 min</option>
-              <option :value="60">1 hr</option>
+            <select v-model="slideshowLabel" @change="updateSlideshow" :disabled="slideshowLoading" class="select" title="What the slideshow plays">
+              <option :value="null">All artwork</option>
+              <option v-for="name in labelNames" :key="name" :value="name">{{ name }} ({{ labelCounts[name] }})</option>
+            </select>
+            <select v-model.number="slideshowDuration" @change="updateSlideshow" :disabled="slideshowLoading" class="select" title="Time per image">
+              <option v-for="d in durationOptions" :key="d" :value="d">{{ formatDuration(d) }}</option>
             </select>
             <label class="toggle-label">
               <input
@@ -41,11 +41,11 @@
         </div>
       </div>
       <div class="header-right">
-        <select v-model="sortOrder" class="duration-select" title="Sort">
+        <select v-model="sortOrder" class="select" title="Sort">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </select>
-        <button class="refresh-btn" @click="loadArtwork" :disabled="loading">
+          <button class="btn btn-ghost btn-sm" @click="loadArtwork" :disabled="loading">
           Refresh
         </button>
       </div>
@@ -53,7 +53,7 @@
 
     <!-- Row 3: Image grid -->
     <ImageGrid
-      :images="sortedArtwork"
+      :images="visibleArtwork"
       :selected-ids="selectedIds"
       :current-id="currentId"
       :loading="loading"
@@ -61,13 +61,32 @@
       @toggle="toggleSelection"
       @select-all="selectAll"
       @preview="(img) => $emit('preview', img, false)"
-    />
+    >
+      <template #header-actions>
+        <div v-if="labelNames.length" class="chip-row" role="tablist" aria-label="Filter by label">
+          <button class="chip" :class="{ active: labelFilter === null }" @click="labelFilter = null">All <span>{{ artwork.length }}</span></button>
+          <button v-for="name in labelNames" :key="name" class="chip" :class="{ active: labelFilter === name }" @click="labelFilter = name">
+            {{ name }} <span>{{ labelCounts[name] }}</span>
+          </button>
+          <button v-if="unlabelledCount" class="chip" :class="{ active: labelFilter === UNLABELLED }" @click="labelFilter = UNLABELLED">
+            Unlabelled <span>{{ unlabelledCount }}</span>
+          </button>
+        </div>
+      </template>
+    </ImageGrid>
 
     <!-- Row 4: Action bar -->
     <ActionBar>
       <template #left>
         <span class="selected-count">{{ selectedIds.size }} selected</span>
       </template>
+      <button
+        class="secondary"
+        :disabled="selectedIds.size === 0"
+        @click="showLabelPicker = true"
+      >
+        Label
+      </button>
       <button
         class="secondary"
         :disabled="selectedIds.size !== 1"
@@ -83,6 +102,14 @@
         Delete ({{ selectedIds.size }})
       </button>
     </ActionBar>
+
+    <LabelPicker
+      v-if="showLabelPicker"
+      :selected="artwork.filter(a => selectedIds.has(a.content_id))"
+      :counts="labelCounts"
+      @close="showLabelPicker = false"
+      @apply="applyLabels"
+    />
   </div>
 </template>
 
@@ -90,6 +117,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import ImageGrid from '../components/ImageGrid.vue'
 import ActionBar from '../components/ActionBar.vue'
+import LabelPicker from '../components/LabelPicker.vue'
 
 const emit = defineEmits(['preview'])
 
@@ -112,12 +140,61 @@ const sortedArtwork = computed(() => {
            (a.content_id || '').localeCompare(b.content_id || '')))
 })
 
+// Labels
+const UNLABELLED = '\u0000unlabelled'
+const labelFilter = ref(null)
+const showLabelPicker = ref(false)
+const labelCounts = computed(() => {
+  const counts = {}
+  for (const a of artwork.value) for (const l of a.labels || []) counts[l] = (counts[l] || 0) + 1
+  return counts
+})
+const labelNames = computed(() => Object.keys(labelCounts.value).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })))
+const unlabelledCount = computed(() => artwork.value.filter(a => !(a.labels || []).length).length)
+const visibleArtwork = computed(() => {
+  if (labelFilter.value === null) return sortedArtwork.value
+  if (labelFilter.value === UNLABELLED) return sortedArtwork.value.filter(a => !(a.labels || []).length)
+  return sortedArtwork.value.filter(a => (a.labels || []).includes(labelFilter.value))
+})
+// A filter whose label no longer exists falls back to All
+watch(labelNames, names => {
+  if (labelFilter.value && labelFilter.value !== UNLABELLED && !names.includes(labelFilter.value)) labelFilter.value = null
+})
+
+const applyLabels = async ({ add, remove }) => {
+  showLabelPicker.value = false
+  const ids = Array.from(selectedIds.value)
+  try {
+    const res = await fetch('/api/tv/labels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_ids: ids, add, remove })
+    })
+    const data = await res.json()
+    if (!res.ok) console.error('Label sync:', data.detail)
+    // Update in place; re-listing the TV is slow
+    const map = data.labels || {}
+    artwork.value = artwork.value.map(a => ({ ...a, labels: map[a.content_id] || [] }))
+  } catch (e) {
+    console.error('Failed to save labels:', e)
+  }
+}
+
 // Slideshow state
 const connected = ref(false)
 const slideshowEnabled = ref(false)
 const slideshowDuration = ref(15)
 const slideshowShuffle = ref(true)
 const slideshowLoading = ref(false)
+const slideshowLabel = ref(null)
+
+// Minutes. The TV takes any value; keep one it reports (e.g. set on the TV itself) selectable.
+const DURATIONS = [2, 3, 5, 10, 15, 30, 60]
+const durationOptions = computed(() =>
+  DURATIONS.includes(slideshowDuration.value)
+    ? DURATIONS
+    : [...DURATIONS, slideshowDuration.value].sort((a, b) => a - b))
+const formatDuration = (m) => m % 1440 === 0 ? `${m / 1440} day` : m % 60 === 0 ? `${m / 60} hr` : `${m} min`
 
 const loadArtwork = async () => {
   loading.value = true
@@ -157,11 +234,12 @@ const loadSlideshowStatus = async () => {
     if (!data.error) {
       // Parse the response - format varies by TV
       slideshowEnabled.value = data.value !== 'off' && data.value !== '0'
-      if (data.duration) {
-        slideshowDuration.value = parseInt(data.duration) || 15
-      }
+      // The TV reports the interval in minutes as `value` ("off" when stopped)
+      const minutes = parseInt(data.value)
+      if (minutes > 0) slideshowDuration.value = minutes
+      slideshowLabel.value = data.label || null
       if (data.type !== undefined) {
-        slideshowShuffle.value = data.type === true || data.type === 'shuffle'
+        slideshowShuffle.value = data.type === true || String(data.type).startsWith('shuffle')
       }
     }
   } catch (e) {
@@ -178,7 +256,8 @@ const updateSlideshow = async () => {
       body: JSON.stringify({
         enabled: slideshowEnabled.value,
         duration: slideshowDuration.value,
-        shuffle: slideshowShuffle.value
+        shuffle: slideshowShuffle.value,
+        label: slideshowLabel.value
       })
     })
   } catch (e) {
@@ -200,7 +279,7 @@ const toggleSelection = (image) => {
 
 const selectAll = (checked) => {
   if (checked) {
-    selectedIds.value = new Set(artwork.value.map(a => a.content_id))
+    selectedIds.value = new Set(visibleArtwork.value.map(a => a.content_id))
   } else {
     selectedIds.value = new Set()
   }
@@ -249,17 +328,17 @@ defineExpose({ loadArtwork })
   display: contents; /* Let children participate in parent subgrid */
 }
 
-/* Row 1: Placeholder to align with source-tabs */
+/* Row 1: matches the source tabs' height on the left */
 .tabs-placeholder {
   display: flex;
-  background: #1a1a2e;
-  border-bottom: 1px solid #2a2a4e;
+  padding: 8px 12px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
-/* Match source-tabs button styling exactly for same height */
 .placeholder-text {
-  padding: 0.75rem;
-  font-size: 0.9rem;
+  padding: 10px 14px 12px;
+  font-size: 0.875rem;
 }
 
 /* Row 2: Panel header */
@@ -267,88 +346,41 @@ defineExpose({ loadArtwork })
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #2a2a4e;
-  background: #12121f;
-  gap: 1rem;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .panel-header h2 {
-  font-size: 1.1rem;
+  font-size: 1rem;
+  font-weight: 600;
   margin: 0;
 }
 
 .slideshow-inline {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: #ccc;
-}
-
-.duration-select {
-  padding: 0.25rem 0.4rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: #2a2a4e;
-  color: white;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.duration-select:focus {
-  outline: none;
-  border-color: #4a90d9;
-}
-
-.duration-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-}
-
-.refresh-btn {
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
-  border: 1px solid #3a3a5e;
-  background: transparent;
-  color: #aaa;
-  cursor: pointer;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background: #2a2a4e;
+  gap: 8px;
 }
 
 .selected-count {
-  color: #888;
-  font-size: 0.9rem;
-}
-
-/* Toggle label for slideshow checkboxes */
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-}
-
-.toggle-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 </style>
